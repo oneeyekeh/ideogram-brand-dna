@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MODELS
-// Primary: Gemini Flash Image ("nano banana 2") — generates images with
-//   multimodal input (text + logo + reference images).
-// Fallback: experimental variant in case preview slot is unavailable.
+// Primary: gemini-2.5-flash-image — Gemini 2.5 Flash Image, a.k.a. "Nano Banana 2".
+//   Supports multimodal input (text + logo + reference images) → image output.
+//   Docs: https://ai.google.dev/gemini-api/docs/image-generation
+// Fallback: gemini-2.0-flash-preview-image-generation — previous generation.
 // ─────────────────────────────────────────────────────────────────────────────
 const IMAGE_GENERATION_MODELS = [
-  'gemini-2.0-flash-preview-image-generation', // Gemini Flash Image — primary
-  'gemini-2.0-flash-exp-image-generation',      // experimental fallback
+  'gemini-2.5-flash-image',                    // Gemini 2.5 Flash Image ("Nano Banana 2") — primary
+  'gemini-2.0-flash-preview-image-generation', // Gemini 2.0 Flash Image — fallback
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
