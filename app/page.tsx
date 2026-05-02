@@ -525,32 +525,57 @@ function BrandsPage({ brands, activeBrand, setActiveBrand, onCreate, onEdit }: {
     <>
       <div className="page-head">
         <h1 className="page-h1">My <em>Brand DNA</em></h1>
-        <p className="page-sub">A library of identities Ideogram can apply to any prompt. Pick one, and every image you generate stays on-brand — colors, type, mood and all.</p>
+        <p className="page-sub">Pick a brand to apply it to every generation.</p>
       </div>
       <div className="page-content">
-        <div className="brand-cards">
-          {brands.map(b=>(
-            <div key={b.id} className={`brand-card ${activeBrand===b.id?'active':''}`} onClick={()=>setActiveBrand(b.id)}>
-              <div className={`top ${b.samples[0]??'grad-1'}`}>
-                {b.logoImage
-                  ? <img src={b.logoImage} alt={b.name} className="logo-preview"/>
-                  : <div className="logo-mk">{b.logoText}</div>}
-                {activeBrand===b.id && <div className="active-badge"><Icon name="check" size={10}/> Active</div>}
-              </div>
-              <div className="body">
-                <div className="nm-row">
-                  <div className="nm">{b.name}</div>
-                  <button className="btn-icon" onClick={e=>{e.stopPropagation();onEdit(b);}}><Icon name="edit" size={12}/></button>
+        {/* Compact mini-card grid */}
+        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:10}}>
+          {brands.map(b => {
+            const isActive = activeBrand === b.id;
+            return (
+              <div key={b.id}
+                onClick={() => setActiveBrand(isActive ? null : b.id)}
+                style={{
+                  background: isActive ? 'var(--accent-soft)' : 'var(--bg-1)',
+                  border:`1px solid ${isActive?'var(--accent)':'var(--line)'}`,
+                  borderRadius:12, padding:'12px 14px', cursor:'pointer', transition:'all 0.15s',
+                }}>
+                {/* Palette bar */}
+                <div style={{height:5, borderRadius:100, overflow:'hidden', display:'flex', marginBottom:10}}>
+                  {b.palette.map((c,i) => <span key={i} style={{flex:1, background:c}}/>)}
                 </div>
-                <div className="voice">{b.voice}</div>
-                <div className="pal">{b.palette.map((c,i)=><span key={i} style={{background:c}}/>)}</div>
-                <div className="ed" style={{marginTop:8}}>Edited {b.edited}</div>
+                {/* Name row */}
+                <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:6}}>
+                  <div>
+                    <div style={{fontSize:13, fontWeight:500, color:'var(--text-1)', display:'flex', alignItems:'center', gap:5}}>
+                      {isActive && <Icon name="check" size={11}/>}
+                      {b.name}
+                    </div>
+                    {b.voice && <div style={{fontSize:11, color:'var(--text-3)', marginTop:2, lineHeight:1.3}}>{b.voice}</div>}
+                  </div>
+                  <button className="btn-icon" style={{flexShrink:0}}
+                    onClick={e=>{e.stopPropagation(); onEdit(b);}}>
+                    <Icon name="edit" size={12}/>
+                  </button>
+                </div>
+                {/* Ref count */}
+                {b.referenceImages.length > 0 && (
+                  <div style={{marginTop:8, fontSize:10, color:'var(--text-4)', display:'flex', alignItems:'center', gap:4}}>
+                    <Icon name="image2" size={10}/> {b.referenceImages.length} ref image{b.referenceImages.length!==1?'s':''}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
-          <button className="add-card" onClick={onCreate}>
-            <Icon name="plus" size={20}/><div>Create Brand DNA</div>
-            <div style={{fontSize:11,color:'var(--text-4)',maxWidth:160,textAlign:'center'}}>Upload a logo and reference images</div>
+            );
+          })}
+          {/* Add new */}
+          <button onClick={onCreate}
+            style={{background:'transparent', border:'1.5px dashed var(--line-2)', borderRadius:12,
+              padding:'12px 14px', cursor:'pointer', transition:'all 0.15s',
+              display:'flex', alignItems:'center', gap:8, color:'var(--text-3)', minHeight:72}}
+            onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor='var(--accent)';(e.currentTarget as HTMLElement).style.color='var(--accent-text)';}}
+            onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor='var(--line-2)';(e.currentTarget as HTMLElement).style.color='var(--text-3)';}}>
+            <Icon name="plus" size={16}/>
+            <span style={{fontSize:12, fontWeight:500}}>New brand</span>
           </button>
         </div>
       </div>
@@ -565,8 +590,6 @@ function BrandEditor({ brand: init, onBack, onSave }: {
 }) {
   const [name, setName] = useState(init?.name ?? '');
   const [voice, setVoice] = useState(init?.voice ?? '');
-  const [keywords, setKeywords] = useState<string[]>(init?.keywords ?? []);
-  const [newKeyword, setNewKeyword] = useState('');
   const [palette, setPalette] = useState<string[]>(init?.palette ?? ['#F5E6D3','#A87856','#3F2A1E','#1A0F0A']);
   const [logoImage, setLogoImage] = useState<string|undefined>(init?.logoImage);
   const [logoText, setLogoText] = useState(init?.logoText ?? '');
@@ -596,7 +619,7 @@ function BrandEditor({ brand: init, onBack, onSave }: {
       id: init?.id ?? Math.random().toString(36).slice(2),
       name: name.trim(), logoText: logoText||name.split(' ')[0], logoImage,
       palette, voice: voice.trim(), edited: 'just now',
-      keywords, samples: init?.samples ?? ['grad-1','grad-3','grad-9'],
+      keywords: [], samples: init?.samples ?? ['grad-1','grad-3','grad-9'],
       referenceImages: refImages,
     });
   };
@@ -614,90 +637,47 @@ function BrandEditor({ brand: init, onBack, onSave }: {
       <div className="page-content">
         <div className="editor">
           <div className="editor-main">
-            {/* Basics */}
+
+            {/* 1 — Brand basics: name + voice only */}
             <div className="section-block">
               <div className="section-h-form"><span className="section-num">1</span> Brand basics</div>
               <div className="field">
                 <label className="field-label">Brand name</label>
                 <input className="input" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Foundry Coffee"/>
               </div>
-              <div className="field">
-                <label className="field-label">Voice &amp; feel</label>
-                <textarea className="textarea" value={voice} onChange={e=>setVoice(e.target.value)} placeholder="A few words about how the brand feels"/>
-              </div>
-              <div className="field">
-                <label className="field-label">Style keywords</label>
-                <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
-                  {keywords.map((k,i)=>(
-                    <span key={i} className="tool-pill" style={{cursor:'default'}}>
-                      {k}
-                      <button onClick={()=>setKeywords(p=>p.filter((_,j)=>j!==i))} style={{color:'var(--text-3)',display:'flex'}}><Icon name="x" size={10}/></button>
-                    </span>
-                  ))}
-                  <div style={{display:'flex',gap:4}}>
-                    <input className="input" style={{width:120,padding:'4px 8px',fontSize:12}}
-                      placeholder="Add keyword" value={newKeyword} onChange={e=>setNewKeyword(e.target.value)}
-                      onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();if(newKeyword.trim()){setKeywords(p=>[...p,newKeyword.trim()]);setNewKeyword('');};}}}/>
-                    <button className="tool-pill" onClick={()=>{if(newKeyword.trim()){setKeywords(p=>[...p,newKeyword.trim()]);setNewKeyword('');}}}>
-                      <Icon name="plus" size={10}/>
-                    </button>
-                  </div>
-                </div>
+              <div className="field" style={{marginBottom:0}}>
+                <label className="field-label">Voice &amp; feel <span style={{color:'var(--text-4)',fontWeight:400}}> — how does this brand feel?</span></label>
+                <textarea className="textarea" value={voice} onChange={e=>setVoice(e.target.value)}
+                  placeholder="e.g. Earthy, slow, handcrafted — warm textures, muted tones, tactile."/>
               </div>
             </div>
 
-            {/* Logo + Colors */}
-            <div className="editor-grid">
-              <div className="section-block">
-                <div className="section-h-form"><span className="section-num">2</span> Logo</div>
-                <div className={`logo-drop ${logoImage?'has-file':''}`} onClick={()=>logoRef.current?.click()}>
-                  {logoImage
-                    ? <img src={logoImage} alt="Logo" style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',padding:8}}/>
-                    : <div style={{textAlign:'center'}}><Icon name="upload" size={18}/><div style={{marginTop:6}}>Click to upload logo</div><div style={{fontSize:10,marginTop:2,color:'var(--text-4)'}}>SVG, PNG, JPG</div></div>}
-                </div>
-                <input ref={logoRef} type="file" className="upload-input" accept="image/*" onChange={handleLogo}/>
-                {logoImage && (
-                  <div style={{marginTop:8,display:'flex',gap:6}}>
-                    <input className="input" style={{flex:1,padding:'6px 10px',fontSize:12}} placeholder="Wordmark text"
-                      value={logoText} onChange={e=>setLogoText(e.target.value)}/>
-                    <button className="btn-icon" onClick={()=>{setLogoImage(undefined);setLogoText('');}}><Icon name="trash" size={13}/></button>
-                  </div>
-                )}
-              </div>
-
-              <div className="section-block">
-                <div className="section-h-form"><span className="section-num">3</span> Colors</div>
-                <div className="swatch-row">
-                  {palette.map((c,i)=>(
-                    <div key={i} className="swatch">
-                      <input type="color" value={c} onChange={e=>setPalette(p=>p.map((x,j)=>j===i?e.target.value:x))}
-                        style={{width:44,height:44,borderRadius:8,border:'1px solid var(--line)',padding:2,background:'var(--bg-2)',cursor:'pointer'}}/>
-                      <div className="swatch-hex">{c.toUpperCase()}</div>
-                    </div>
-                  ))}
-                  {palette.length < 6 && (
-                    <div className="swatch">
-                      <div className="swatch-add" onClick={()=>setPalette(p=>[...p,'#888888'])}><Icon name="plus" size={12}/></div>
-                      <div className="swatch-hex" style={{opacity:0}}>add</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Typography */}
+            {/* 2 — Logo */}
             <div className="section-block">
-              <div className="section-h-form"><span className="section-num">4</span> Typography</div>
-              <div className="type-pair">
-                <div className="type-card"><div className="preview" style={{fontFamily:'Instrument Serif, serif'}}>Display Aa</div><div className="meta">Instrument Serif · 400</div></div>
-                <div className="type-card"><div className="preview" style={{fontFamily:'Inter, sans-serif',fontWeight:500}}>Body Aa</div><div className="meta">Inter · 500</div></div>
+              <div className="section-h-form"><span className="section-num">2</span> Logo</div>
+              <div className={`logo-drop ${logoImage?'has-file':''}`} onClick={()=>logoRef.current?.click()}>
+                {logoImage
+                  ? <img src={logoImage} alt="Logo" style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',padding:8}}/>
+                  : <div style={{textAlign:'center'}}><Icon name="upload" size={18}/><div style={{marginTop:6}}>Click to upload logo</div><div style={{fontSize:10,marginTop:2,color:'var(--text-4)'}}>SVG, PNG, JPG</div></div>}
               </div>
+              <input ref={logoRef} type="file" className="upload-input" accept="image/*" onChange={handleLogo}/>
+              {logoImage && (
+                <div style={{marginTop:8,display:'flex',gap:6}}>
+                  <input className="input" style={{flex:1,padding:'6px 10px',fontSize:12}} placeholder="Wordmark text"
+                    value={logoText} onChange={e=>setLogoText(e.target.value)}/>
+                  <button className="btn-icon" onClick={()=>{setLogoImage(undefined);setLogoText('');}}><Icon name="trash" size={13}/></button>
+                </div>
+              )}
             </div>
 
-            {/* Reference imagery */}
+            {/* 3 — Reference imagery (higher priority than color — comes first) */}
             <div className="section-block">
-              <div className="section-h-form"><span className="section-num">5</span> Reference imagery</div>
-              <p style={{fontSize:12,color:'var(--text-3)',marginBottom:12}}>Upload up to 5 examples. These guide the visual feel of generated images.</p>
+              <div className="section-h-form"><span className="section-num">3</span> Reference imagery
+                <span style={{marginLeft:'auto',fontSize:10,color:'var(--accent-text)',background:'var(--accent-soft)',padding:'2px 8px',borderRadius:100}}>Highest priority</span>
+              </div>
+              <p style={{fontSize:12,color:'var(--text-3)',marginBottom:12}}>
+                Upload up to 5 example images. The model will extract their visual style and use it to guide every generation — this has more influence than the color palette below.
+              </p>
               <div className="ref-grid">
                 {refImages.map(img=>(
                   <div key={img.id} className="ref-tile" style={{position:'relative'}}>
@@ -708,11 +688,34 @@ function BrandEditor({ brand: init, onBack, onSave }: {
                     </button>
                   </div>
                 ))}
-                {refImages.length < 5 && Array.from({length:Math.max(1,4-refImages.length)}).map((_,i)=>(
-                  <div key={`add-${i}`} className="ref-tile add" onClick={()=>refRef.current?.click()}><Icon name="plus" size={14}/></div>
+                {Array.from({length:Math.max(0, 5 - refImages.length)}).map((_,i)=>(
+                  <div key={`add-${i}`} className="ref-tile add" onClick={()=>refRef.current?.click()}>
+                    <Icon name="plus" size={14}/>
+                  </div>
                 ))}
               </div>
               <input ref={refRef} type="file" className="upload-input" accept="image/*" multiple onChange={handleRefs}/>
+            </div>
+
+            {/* 4 — Colors */}
+            <div className="section-block">
+              <div className="section-h-form"><span className="section-num">4</span> Color palette</div>
+              <p style={{fontSize:12,color:'var(--text-3)',marginBottom:12}}>Click a swatch to change it. Used when no reference images are present.</p>
+              <div className="swatch-row">
+                {palette.map((c,i)=>(
+                  <div key={i} className="swatch">
+                    <input type="color" value={c} onChange={e=>setPalette(p=>p.map((x,j)=>j===i?e.target.value:x))}
+                      style={{width:44,height:44,borderRadius:8,border:'1px solid var(--line)',padding:2,background:'var(--bg-2)',cursor:'pointer'}}/>
+                    <div className="swatch-hex">{c.toUpperCase()}</div>
+                  </div>
+                ))}
+                {palette.length < 6 && (
+                  <div className="swatch">
+                    <div className="swatch-add" onClick={()=>setPalette(p=>[...p,'#888888'])}><Icon name="plus" size={12}/></div>
+                    <div className="swatch-hex" style={{opacity:0}}>add</div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
@@ -729,10 +732,17 @@ function BrandEditor({ brand: init, onBack, onSave }: {
                 : logoText ? <div className="corner-logo">{logoText}</div> : null}
             </div>
             <div className="preview-pal">{palette.map((c,i)=><span key={i} style={{background:c}}/>)}</div>
-            <div className="preview-row"><span className="k">Display</span><span style={{fontFamily:'Instrument Serif, serif',fontSize:14}}>Instrument Serif</span></div>
-            <div className="preview-row"><span className="k">Body</span><span>Inter</span></div>
-            <div className="preview-row"><span className="k">Voice</span><span style={{maxWidth:180,textAlign:'right'}}>{voice||'Not set'}</span></div>
-            <div className="preview-row"><span className="k">References</span><span style={{color:refImages.length>0?'#C7F25E':'var(--text-3)'}}>{refImages.length} / 5</span></div>
+            <div className="preview-row"><span className="k">Voice</span><span style={{maxWidth:160,textAlign:'right',fontSize:11}}>{voice||'Not set'}</span></div>
+            <div className="preview-row">
+              <span className="k">References</span>
+              <span style={{color:refImages.length>0?'#C7F25E':'var(--text-3)'}}>
+                {refImages.length > 0 ? `${refImages.length} / 5 ✓` : '0 / 5'}
+              </span>
+            </div>
+            <div className="preview-row">
+              <span className="k">Logo</span>
+              <span style={{color:logoImage?'#C7F25E':'var(--text-3)'}}>{logoImage?'Uploaded':'None'}</span>
+            </div>
           </aside>
         </div>
       </div>
