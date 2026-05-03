@@ -811,30 +811,22 @@ function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail, debugDoc
   );
 }
 
-// ── Prompt gallery ───────────────────────────────────────────────────────────
+// ── Prompt section (inline, replaces gallery) ────────────────────────────────
 
-function PromptGallery({ onSelect, onClose }: { onSelect: (p: string) => void; onClose: () => void }) {
+function PromptSection({ onSelect, onBack }: { onSelect: (p: string) => void; onBack: () => void }) {
   return (
-    <div className="pg-overlay" onClick={onClose}>
-      <div className="pg-panel" onClick={e => e.stopPropagation()}>
-        <button className="pg-close" onClick={onClose}><Icon name="x" size={15}/></button>
-        <div className="pg-header">
-          <h2 className="pg-title">
-            <span className="pg-title-kicker">What will you create</span>
-            <em>on-brand</em> today?
-          </h2>
-          <p className="pg-sub">Pick a prompt to get started — every detail is editable before you generate.</p>
-        </div>
-        <div className="pg-body">
-          <div className="pg-grid">
-            {PROMPT_SUGGESTIONS.map((s, i) => (
-              <button key={i} className="pg-card" onClick={() => { onSelect(s.prompt); onClose(); }}>
-                <span className="pg-card-label">{s.label}</span>
-                <p className="pg-card-text">{highlightText(s.prompt, s.hl)}</p>
-              </button>
-            ))}
-          </div>
-        </div>
+    <div style={{marginTop: 32, animation: 'fadeSlideUp 0.22s ease both'}}>
+      <div className="sec-head" style={{marginTop: 0, marginBottom: 18}}>
+        <h2>Prompt <em>ideas</em></h2>
+        <button className="more" onClick={onBack}>← Explore creations</button>
+      </div>
+      <div className="ps-grid">
+        {PROMPT_SUGGESTIONS.map((s, i) => (
+          <button key={i} className="ps-card" onClick={() => onSelect(s.prompt)}>
+            <span className="ps-label">{s.label}</span>
+            <p className="ps-text">{highlightText(s.prompt, s.hl)}</p>
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -906,15 +898,9 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
     );
   }
 
-  // Idle: hero + composer + gallery
+  // Idle: hero + composer + chips + flippable bottom section
   return (
     <div className="explore">
-      {showGallery && (
-        <PromptGallery
-          onSelect={p => { setPrompt(p); }}
-          onClose={() => setShowGallery(false)}
-        />
-      )}
       <h1 className="hero-title">
         <span className="hero-kicker">What will you create</span>
         <em>on-brand</em> today?
@@ -930,11 +916,14 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
             <span className="chip-text">{s.prompt.split('—')[0].trim().replace(/,$/, '')}</span>
           </button>
         ))}
-        <button className="prompt-chip prompt-chip-more" onClick={() => setShowGallery(true)}>
-          More prompts →
+        <button className="prompt-chip prompt-chip-more" onClick={() => setShowGallery(v => !v)}>
+          {showGallery ? '← Gallery' : 'More prompts →'}
         </button>
       </div>
-      <ExploreGallery/>
+      {showGallery
+        ? <PromptSection onSelect={p => { setPrompt(p); setShowGallery(false); }} onBack={() => setShowGallery(false)}/>
+        : <ExploreGallery/>
+      }
     </div>
   );
 }
