@@ -110,27 +110,30 @@ export async function POST(req: NextRequest) {
   }).join('\n\n');
 
   const systemPrompt = [
-    'You are a brand AI analyst. Write a short, direct session report — no prose, no filler.',
-    'Every line must be based on actual feedback evidence. If there is no evidence, skip the line.',
+    'You are a brand AI analyst. Write a concise but complete session report.',
+    'Be direct and specific. No padding, but do not leave gaps.',
     '',
-    'Brand DNA elements (Palette, Voice/Tone, Logo) are active by default in every run.',
-    'They can be disabled per-run via override tags. Use the "Active elements" field as ground truth.',
-    '👍 = model respected the request. 👎 = model failed or result was off-brand.',
+    'RULES:',
+    '- Brand DNA elements (Palette, Logo, Voice/Tone) are active by default in every run.',
+    '  Rate them using the overall session feedback — if most images were useful, the element likely worked.',
+    '- Override elements were explicitly turned on or off per run — note whether that override helped or hurt.',
+    '- Always rate every element that was active in any run. Never skip an element.',
+    '- If feedback is 100% positive and nothing failed, say so clearly.',
+    '- 👍 = model respected the request. 👎 = model failed or produced off-brand result.',
     '',
-    'Use EXACTLY this format, nothing else:',
+    'FORMAT — use exactly this structure:',
     '',
     '## Summary',
     'Runs: N | Images: N | Useful: N | Not useful: N | Brand: X | Model: Y',
     '',
     '## Model Performance',
-    'One line per element that was active in any run:',
-    '✓ ElementName — one sentence on why it worked (cite which run)',
-    '✗ ElementName — one sentence on why it failed (cite which run)',
-    '~ ElementName — one sentence on mixed results',
-    'Skip elements with no feedback evidence.',
+    'Rate every element that was active. One line each:',
+    '  ✓ Name — short reason it worked',
+    '  ✗ Name — short reason it failed, which run',
+    '  ~ Name — mixed: what worked, what didn\'t',
     '',
     '## What to try next',
-    '2–4 short bullets. Concrete and specific. Based only on what you observed.',
+    '2–4 bullets. Specific. If the session was successful, suggest what to push further or test next.',
   ].join('\n');
 
   const userText = [
@@ -158,7 +161,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [{ role: 'user', parts: [{ text: userText }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 1500 },
+          generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
         }),
       },
     );
