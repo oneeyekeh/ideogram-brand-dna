@@ -32,6 +32,19 @@ interface StreamMessage {
   referenceImages?: AttachedImage[];
   error?: string;
   variant?: 'regen' | 'refine';
+  trace?: GenerationTrace;
+}
+
+interface GenerationTrace {
+  status: 'generating' | 'complete' | 'error';
+  mode: 'generate' | 'regenerate' | 'refine';
+  prompt: string;
+  brandName?: string;
+  hasLogo: boolean;
+  palette: string[];
+  tone?: string;
+  referenceCount: number;
+  referenceNames: string[];
 }
 
 interface DetailState {
@@ -239,6 +252,26 @@ function dataURLtoBase64(dataURL: string) {
   const [header, data] = dataURL.split(',');
   const mimeType = header.match(/:(.*?);/)?.[1] ?? 'image/jpeg';
   return { data, mimeType };
+}
+
+function createGenerationTrace(
+  prompt: string,
+  brand: Brand | null,
+  refs: AttachedImage[],
+  mode: GenerationTrace['mode'] = 'generate',
+  status: GenerationTrace['status'] = 'generating',
+): GenerationTrace {
+  return {
+    status,
+    mode,
+    prompt,
+    brandName: brand?.name,
+    hasLogo: !!brand?.logoImage,
+    palette: brand?.palette ?? [],
+    tone: brand?.voice,
+    referenceCount: refs.length,
+    referenceNames: refs.map(ref => ref.name),
+  };
 }
 
 function useLocalStorage<T>(key: string, initial: T): [T, React.Dispatch<React.SetStateAction<T>>] {
@@ -519,6 +552,52 @@ function RefineForm({ onSubmit, onCancel }: {
   );
 }
 
+function GenerationTraceCard({ trace, error }: { trace: GenerationTrace; error?: string }) {
+  const modeLabel = trace.mode === 'refine' ? 'Refinement run' : trace.mode === 'regenerate' ? 'Regeneration run' : 'Generation run';
+  const statusLabel = trace.status === 'generating' ? 'Generating' : trace.status === 'error' ? 'Needs attention' : 'Completed';
+  const palette = trace.palette.slice(0, 5);
+  const steps = [
+    { label: 'Prompt', value: trace.prompt },
+    { label: 'Brand', value: trace.brandName ?? 'No Brand DNA selected' },
+    { label: 'Logo', value: trace.hasLogo ? 'Official logo attached and prioritized' : 'No logo attached' },
+    { label: 'Tone', value: trace.tone?.trim() || 'Infer tone from references and prompt' },
+    { label: 'References', value: trace.referenceCount ? `${trace.referenceCount} campaign reference${trace.referenceCount === 1 ? '' : 's'} attached` : 'No references attached' },
+    { label: 'Priority', value: 'Brand DNA -> reference DNA -> user prompt scene -> quality pass' },
+  ];
+
+  return (
+    <div className={`trace-card ${trace.status}`}>
+      <div className="trace-top">
+        <div>
+          <div className="trace-eyebrow">{modeLabel}</div>
+          <div className="trace-title">{statusLabel}</div>
+        </div>
+        <span className="trace-status-dot"/>
+      </div>
+      <div className="trace-list">
+        {steps.map(step => (
+          <div key={step.label} className="trace-step">
+            <div className="trace-step-label">{step.label}</div>
+            <div className="trace-step-value">{step.value}</div>
+          </div>
+        ))}
+      </div>
+      {palette.length > 0 && (
+        <div className="trace-palette">
+          {palette.map((color, i) => <span key={`${color}-${i}`} style={{background: color}}/>)}
+        </div>
+      )}
+      {trace.referenceNames.length > 0 && (
+        <div className="trace-ref-names">
+          {trace.referenceNames.slice(0, 3).map(name => <span key={name}>{name}</span>)}
+          {trace.referenceNames.length > 3 && <span>+{trace.referenceNames.length - 3} more</span>}
+        </div>
+      )}
+      {error && <div className="trace-error">{error}</div>}
+    </div>
+  );
+}
+
 // ── Explore active — right results panel ──────────────────────────────────────
 
 function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail }: {
@@ -625,31 +704,12 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
             <div style={{flex:1}}/>
           </div>
           <div className="chat-stream">
-            {stream.map((m,i)=>(
-              m.role==='user' ? (
-                m.attachedImages?.length ? (
-                  <div key={i} className={`msg-user ${m.variant ? `msg-user-${m.variant}` : ''}`}>
-                    <div className="msg-ref-grid">
-                      {m.attachedImages.map((src, j) => <img key={j} src={src} alt="" />)}
-                    </div>
-                  </div>
-                ) : null
-              ) : (
-                <div key={i} className={`msg-asst ${m.variant ? `msg-asst-${m.variant}` : ''}`}>
-                  <div className={`asst-head ${m.error ? 'error' : ''}`}>
-                    {!m.error && <span className={`dot ${m.loading ? 'generating-dot' : ''}`}/>}
-                    <span>
-                      {m.loading
-                        ? <>{brand ? <><span style={{color:'var(--accent-text)',fontWeight:500}}>{brand.name}</span> DNA</> : 'Ideogram'} · Generating…</>
-                        : m.error ? 'Error' : m.variant === 'regen' ? 'Regenerated' : m.variant === 'refine' ? 'Refined' : 'Ideogram'}
-                    </span>
-                  </div>
-                  {!m.loading && m.error && <div className="error-banner">{m.error}</div>}
-                  {!m.loading && !m.error && m.text && (
-                    <div style={{fontSize:12,color:'var(--text-2)'}}>{m.text}</div>
-                  )}
-                </div>
-              )
+            <div className="trace-intro">
+              <div className="trace-intro-title">Brand decision log</div>
+              <div className="trace-intro-copy">Each run shows the actual priority stack used before image generation.</div>
+            </div>
+            {stream.filter(m => m.role === 'asst' && m.trace).map((m, i) => (
+              <GenerationTraceCard key={i} trace={m.trace!} error={m.error}/>
             ))}
           </div>
           <div className="composer-foot">
@@ -1155,11 +1215,14 @@ export default function App() {
       ].slice(0, 40));
       setStream(prev => {
         const next = [...prev];
+        const prevTrace = next[msgIdx]?.trace;
         next[msgIdx] = {
           role: 'asst',
           images: cappedImages,
           prompt: userPrompt,
           referenceImages: attachedRefs,
+          variant: next[msgIdx]?.variant,
+          trace: prevTrace ? { ...prevTrace, status: 'complete' } : createGenerationTrace(userPrompt, currentBrand, attachedRefs, 'generate', 'complete'),
         };
         return next;
       });
@@ -1167,7 +1230,16 @@ export default function App() {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setStream(prev => {
         const next = [...prev];
-        next[msgIdx] = { role: 'asst', images: [], prompt: userPrompt, referenceImages: attachedRefs, error: message };
+        const prevTrace = next[msgIdx]?.trace;
+        next[msgIdx] = {
+          role: 'asst',
+          images: [],
+          prompt: userPrompt,
+          referenceImages: attachedRefs,
+          variant: next[msgIdx]?.variant,
+          error: message,
+          trace: prevTrace ? { ...prevTrace, status: 'error' } : createGenerationTrace(userPrompt, currentBrand, attachedRefs, 'generate', 'error'),
+        };
         return next;
       });
     }
@@ -1182,25 +1254,26 @@ export default function App() {
 
     setStream(prev => {
       const userMsg: StreamMessage = { role: 'user', text: userPrompt, attachedImages: snap.map(img => img.dataURL), referenceImages: snap };
-      const loadingMsg: StreamMessage = { role: 'asst', loading: true };
+      const loadingMsg: StreamMessage = { role: 'asst', loading: true, trace: createGenerationTrace(userPrompt, brand, snap) };
       const next = [...prev, userMsg, loadingMsg];
       const idx = next.length - 1;
       setTimeout(() => generateImages(userPrompt, idx, snap), 0);
       return next;
     });
-  }, [prompt, attached, generateImages]);
+  }, [prompt, attached, brand, generateImages]);
 
   const handleRegenerate = useCallback((msg: StreamMessage) => {
     if (!msg.prompt) return;
+    const refs = msg.referenceImages ?? [];
     setStream(prev => {
       const userMsg: StreamMessage = { role: 'user', text: '↺ Regenerate', variant: 'regen' };
-      const loadingMsg: StreamMessage = { role: 'asst', loading: true, variant: 'regen' };
+      const loadingMsg: StreamMessage = { role: 'asst', loading: true, variant: 'regen', trace: createGenerationTrace(msg.prompt!, brand, refs, 'regenerate') };
       const next = [...prev, userMsg, loadingMsg];
       const idx = next.length - 1;
-      setTimeout(() => generateImages(msg.prompt!, idx, msg.referenceImages ?? []), 0);
+      setTimeout(() => generateImages(msg.prompt!, idx, refs), 0);
       return next;
     });
-  }, [generateImages]);
+  }, [brand, generateImages]);
 
   const handleRefine = useCallback((msg: StreamMessage, state: RefineState) => {
     if (!msg.prompt) return;
@@ -1210,18 +1283,19 @@ export default function App() {
     const notes = state.q4.trim() ? `Direction: ${state.q4.trim()}` : '';
     const feedback = [issues, changes, focus, notes].filter(Boolean).join(' ');
     const refinedPrompt = `${msg.prompt}\n\nREFINEMENT REQUEST: The previous generation had problems. ${feedback} Please generate a significantly improved version that fixes these specific issues while maintaining full brand DNA compliance.`;
+    const refs = msg.referenceImages ?? [];
 
     setStream(prev => {
       const parts = [state.q1, state.q2, state.q3].flat().filter(Boolean);
       const label = parts.slice(0, 3).join(' · ') || 'Refinement';
       const userMsg: StreamMessage = { role: 'user', text: `✦ Refine: ${label}`, variant: 'refine' };
-      const loadingMsg: StreamMessage = { role: 'asst', loading: true, variant: 'refine' };
+      const loadingMsg: StreamMessage = { role: 'asst', loading: true, variant: 'refine', trace: createGenerationTrace(refinedPrompt, brand, refs, 'refine') };
       const next = [...prev, userMsg, loadingMsg];
       const idx = next.length - 1;
-      setTimeout(() => generateImages(refinedPrompt, idx, msg.referenceImages ?? []), 0);
+      setTimeout(() => generateImages(refinedPrompt, idx, refs), 0);
       return next;
     });
-  }, [generateImages]);
+  }, [brand, generateImages]);
 
   const startCreate = () => { setEditingBrand(null); setPage('editor'); };
   const startEdit = (b: Brand) => { setEditingBrand(b); setPage('editor'); };
