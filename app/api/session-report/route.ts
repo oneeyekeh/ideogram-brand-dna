@@ -27,24 +27,31 @@ const DNA_OVERRIDE_OFF: Array<{ element: string; offKeywords: string[] }> = [
 
 // Tags that explicitly enable an optional element via override
 const OVERRIDE_ON_SIGNALS: Array<{ label: string; keywords: string[] }> = [
-  { label: 'Logo (override on)',        keywords: ['logo accurately rendered'] },
-  { label: 'Text / Copy (override on)', keywords: ['brand name as text', 'intentional creative or campaign text'] },
-  { label: 'Face (override on)',        keywords: ['face clearly visible'] },
-  { label: 'Person (override on)',      keywords: ['person in scene'] },
-  { label: 'Copy Space (override on)',  keywords: ['generous negative space'] },
-  { label: 'Atmosphere (override on)',  keywords: ['lifestyle atmosphere', 'clean studio'] },
+  { label: 'Logo',        keywords: ['logo accurately rendered'] },
+  { label: 'Text / Copy', keywords: ['brand name as text', 'intentional creative or campaign text'] },
+  { label: 'Face',        keywords: ['face clearly visible'] },
+  { label: 'Person',      keywords: ['person in scene'] },
+  { label: 'Copy Space',  keywords: ['generous negative space'] },
+  { label: 'Atmosphere',  keywords: ['lifestyle atmosphere', 'clean studio'] },
+  { label: 'Brand Colors',keywords: ['brand colors dominant'] },
 ];
+
+function classifyRun(prompt: string): 'base' | 'followup' | 'refinement' {
+  if (/REFINEMENT REQUEST/i.test(prompt)) return 'refinement';
+  if (/FOLLOW-UP REQUEST/i.test(prompt)) return 'followup';
+  return 'base';
+}
 
 function describeRunElements(prompt: string, alwaysActive: string[]): string {
   const lower = prompt.toLowerCase();
 
   const overriddenOff = DNA_OVERRIDE_OFF
     .filter(d => d.offKeywords.some(k => lower.includes(k.toLowerCase())))
-    .map(d => `${d.element} (disabled via override)`);
+    .map(d => `${d.element} disabled`);
 
   const overriddenOn = OVERRIDE_ON_SIGNALS
     .filter(d => d.keywords.some(k => lower.includes(k.toLowerCase())))
-    .map(d => d.label);
+    .map(d => `${d.label} (override on)`);
 
   const activeFromDNA = alwaysActive.filter(
     el => !DNA_OVERRIDE_OFF.some(d =>
@@ -54,7 +61,7 @@ function describeRunElements(prompt: string, alwaysActive: string[]): string {
   );
 
   const all = [
-    ...activeFromDNA.map(e => `${e} (from Brand DNA)`),
+    ...activeFromDNA.map(e => `${e} (Brand DNA)`),
     ...overriddenOn,
     ...overriddenOff,
   ];
@@ -75,75 +82,99 @@ export async function POST(req: NextRequest) {
   const { brand, runs, totalImages, models } = body;
   const useful = runs.flatMap(r => r.feedback).filter(f => f === 'up').length;
   const notUseful = runs.flatMap(r => r.feedback).filter(f => f === 'down').length;
+  const unrated = runs.flatMap(r => r.feedback).filter(f => f === null).length;
 
-  // Brand DNA elements that are ALWAYS active (applied to every run via the base system prompt)
   const alwaysActiveElements: string[] = [];
   if (brand?.palette?.length) alwaysActiveElements.push('Palette');
   if (brand?.tone) alwaysActiveElements.push('Voice / Tone');
   if (brand?.hasLogo) alwaysActiveElements.push('Logo');
 
   const runsText = runs.map(r => {
+    const type = classifyRun(r.prompt);
     const feedbackStr = r.feedback.map((f, i) =>
-      `Image ${i + 1}: ${f === 'up' ? '👍 useful' : f === 'down' ? '👎 not useful' : 'no rating'}`
+      `Image ${i + 1}: ${f === 'up' ? '👍 useful' : f === 'down' ? '👎 not useful' : 'unrated'}`
     ).join(', ');
+
+    // Extract just the most recent instruction layer for readability
+    const promptLines = r.prompt.trim().split('\n');
+    const lastSection = promptLines.slice(
+      Math.max(0, promptLines.lastIndexOf('') + 1)
+    ).join(' ').trim().slice(0, 300);
+
     return [
-      `Run ${r.runNumber}`,
-      `Prompt: "${r.prompt.replace(/\s+/g, ' ').trim()}"`,
+      `--- Run ${r.runNumber} [${type}] ---`,
+      `Core intent: ${lastSection}`,
       `Active elements: ${describeRunElements(r.prompt, alwaysActiveElements)}`,
       `Feedback: ${feedbackStr}`,
     ].join('\n');
   }).join('\n\n');
 
   const systemPrompt = [
-    'You are a brand AI analyst. Analyze this image-generation session and write a concise report.',
-    'Be direct and opinionated. Base every rating on actual feedback evidence — do not guess.',
+    'You are a senior brand AI analyst reviewing an image-generation session.',
+    'Your job is to produce a smart, honest, specific session report that helps the user understand what worked,',
+    'what failed, and what to do next. Write as a colleague, not a form-filler.',
     '',
-    'IMPORTANT: Brand DNA elements (Palette, Voice/Tone, Logo when provided) are active by default in every run.',
-    'They can be disabled per-run via override tags (e.g. "no logo", "neutral muted color palette").',
-    'Each run below lists which elements were active, disabled, or overridden — use that as ground truth.',
-    'Rate elements based on whether feedback suggests the model respected them when they were active.',
-    'If an element was disabled via override in all runs, mark it — Disabled.',
-    'Do NOT mark Brand DNA elements as "Not tested" just because no explicit mod tag was added.',
+    'CONTEXT:',
+    '- Brand DNA elements (Palette, Voice/Tone, Logo) are applied by default to every run.',
+    '- They can be disabled per-run via override tags (e.g. "no logo", "neutral muted color palette").',
+    '- Override elements (face, person, logo, brand colors, etc.) are explicitly activated or disabled per run.',
+    '- Use the per-run "Active elements" field as ground truth for what was requested.',
+    '- Runs are typed: base (first prompt), followup (same session, new direction), refinement (fixing a previous result).',
+    '- 👍 useful = model respected the request. 👎 not useful = model failed or result was off-brand.',
     '',
-    'Output EXACTLY this markdown structure, no extra sections:',
+    'OUTPUT FORMAT — use exactly this structure:',
     '',
     '## Summary',
-    '(keep the stats exactly as provided — do not change numbers)',
+    '(fill in the stats block exactly as given)',
+    '',
+    '## Session Arc',
+    'In 2–4 sentences: describe what the user was trying to do across the session, how the approach evolved',
+    '(did they add overrides? refine multiple times?), and whether the session converged or stalled.',
     '',
     '## Brand Element Performance',
-    'Rate each element. Use ✓ Good, ✗ Weak, or ~ Unclear (not enough feedback).',
-    'One line per element: rating + one short sentence of evidence.',
-    'Always include the always-active Brand DNA elements listed below.',
-    'Also include any override elements that appeared in individual run prompts.',
+    'For every element that was active in any run, give one line:',
+    '  ✓ Good — model respected it, feedback confirms',
+    '  ✗ Weak — model failed it, feedback confirms',
+    '  ~ Inconsistent — mixed results across runs',
+    '  — Disabled — turned off via override in all runs',
+    'Include evidence (which run, what happened). Be specific.',
+    '',
+    '## Override Effectiveness',
+    'Only include this section if the user used overrides.',
+    'For each override that was activated: did it work? Did adding it improve or worsen results?',
+    'Note if any override seemed to conflict with another or with Brand DNA.',
+    '',
+    '## Refinement Analysis',
+    'Only include this section if refinement runs exist.',
+    'Did the refinements improve the result? What specific issues were targeted vs. what actually changed?',
     '',
     '## What Worked',
-    '1–3 short bullets. Only write this if feedback clearly shows something succeeded.',
+    '1–3 short bullets. Only from evidence in the feedback.',
     '',
     '## What Didn\'t Work',
-    '1–3 short bullets. Only write this if feedback clearly shows something failed.',
+    '1–3 short bullets. Only from evidence in the feedback.',
     '',
-    '## Takeaway',
-    '2–3 sentences max. Specific and actionable for the next session.',
-    'Focus on what to change or try differently, not what already succeeded.',
+    '## Recommendations for Next Session',
+    '3–5 specific, actionable bullets. Reference what you observed.',
+    'Suggest what to keep, drop, change, or try differently.',
   ].join('\n');
 
   const userText = [
     `BRAND: ${brand?.name ?? 'none'}`,
     `Palette: ${brand?.palette?.join(', ') || 'not set'}`,
-    `Voice: ${brand?.tone || 'not specified'}`,
-    `Logo asset available: ${brand?.hasLogo ? 'yes' : 'no'}`,
-    `Models used: ${models.join(', ') || 'unknown'}`,
+    `Voice / Tone: ${brand?.tone || 'not specified'}`,
+    `Logo asset: ${brand?.hasLogo ? 'attached' : 'not attached'}`,
+    `Always-active Brand DNA elements: ${alwaysActiveElements.join(', ') || 'none'}`,
+    `Model(s): ${models.join(', ') || 'unknown'}`,
     '',
-    `ALWAYS-ACTIVE BRAND DNA ELEMENTS (present in every run): ${alwaysActiveElements.join(', ') || 'none'}`,
+    `STATS: ${runs.length} runs | ${totalImages} images | ${useful} 👍 useful | ${notUseful} 👎 not useful | ${unrated} unrated`,
     '',
-    `STATS: ${runs.length} runs | ${totalImages} images | ${useful} useful | ${notUseful} not useful`,
-    '',
-    'RUNS:',
+    'SESSION RUNS:',
     runsText,
     '',
     '---',
-    'Now write the report following the exact structure above.',
-    `Fill in the Summary section with these exact values: Runs: ${runs.length} | Images generated: ${totalImages} | Useful: ${useful} | Not useful: ${notUseful} | Brand: ${brand?.name ?? 'none'} | Model: ${models.join(', ') || 'unknown'}`,
+    `Now write the full report. Start the Summary section with exactly:`,
+    `Runs: ${runs.length} | Images generated: ${totalImages} | Useful: ${useful} | Not useful: ${notUseful} | Brand: ${brand?.name ?? 'none'} | Model: ${models.join(', ') || 'unknown'}`,
   ].join('\n');
 
   try {
@@ -155,7 +186,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [{ role: 'user', parts: [{ text: userText }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
+          generationConfig: { temperature: 0.4, maxOutputTokens: 4096 },
         }),
       },
     );
