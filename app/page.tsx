@@ -400,10 +400,14 @@ function formatDebugMarkdown(
   ].join('\n');
 }
 
-function useLocalStorage<T>(key: string, initial: T): [T, React.Dispatch<React.SetStateAction<T>>] {
+function useLocalStorage<T>(key: string, initial: T, transform?: (v: T) => T): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [value, setValue] = useState<T>(() => {
     if (typeof window === 'undefined') return initial;
-    try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : initial; } catch { return initial; }
+    try {
+      const s = localStorage.getItem(key);
+      const parsed: T = s ? JSON.parse(s) : initial;
+      return transform ? transform(parsed) : parsed;
+    } catch { return initial; }
   });
   useEffect(() => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }, [key, value]);
   return [value, setValue];
@@ -1601,15 +1605,18 @@ export default function App() {
   const [activeBrand, setActiveBrand] = useLocalStorage<string|null>('ideogram-active-brand', null);
   const [editingBrand, setEditingBrand] = useState<Brand|null>(null);
 
-  const [stream, setStream] = useState<StreamMessage[]>([]);
+  // Strip any loading-state messages left over from a previous session before restoring
+  const [stream, setStream] = useLocalStorage<StreamMessage[]>('ideogram-current-stream', [], v =>
+    v.map(m => m.loading ? { ...m, loading: false, error: 'Session was interrupted.' } : m)
+  );
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
   const [activePreset, setActivePreset] = useState<string|null>(null);
   const [detail, setDetail] = useState<DetailState|null>(null);
   const [debugDoc, setDebugDoc] = useState<DebugDocState | null>(null);
   const [attached, setAttached] = useState<AttachedImage[]>([]);
-  const [savedImages, setSavedImages] = useState<SavedImage[]>([]);
-  const [imageFeedback, setImageFeedback] = useState<ImageFeedback>({});
+  const [savedImages, setSavedImages] = useLocalStorage<SavedImage[]>('ideogram-saved-images', []);
+  const [imageFeedback, setImageFeedback] = useLocalStorage<ImageFeedback>('ideogram-current-feedback', {});
   const [sessions, setSessions] = useLocalStorage<SessionRecord[]>('ideogram-sessions', []);
 
   const brand = brands.find(b => b.id === activeBrand) ?? null;
