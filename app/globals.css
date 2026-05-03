@@ -95,14 +95,14 @@ input, textarea { font: inherit; color: inherit; background: none; border: none;
 .prompt-chip-more { color: var(--text-3); font-size: 12px; border-style: dashed; }
 .prompt-chip-more:hover { color: var(--text-1); border-color: var(--accent); background: var(--accent-soft); border-style: dashed; }
 
-/* Prompt highlight */
-.prompt-hl { color: var(--accent-text); }
+/* Prompt highlight — one word per prompt, just brighter than body */
+.prompt-hl { color: var(--text-1); }
 
 /* Prompt section — inline flip of explore gallery */
 .ps-grid { column-count: 3; column-gap: 12px; }
-.ps-card { display: inline-block; width: 100%; margin: 0 0 12px; text-align: left; background: var(--bg-1); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px 20px; cursor: pointer; transition: all 0.18s; break-inside: avoid; }
-.ps-card:hover { border-color: var(--accent); background: #141418; transform: translateY(-1px); box-shadow: 0 6px 24px rgba(124,92,255,0.1); }
-.ps-label { display: inline-flex; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent-text); background: var(--accent-soft); padding: 3px 9px; border-radius: 100px; margin-bottom: 12px; }
+.ps-card { display: inline-block; width: 100%; margin: 0 0 12px; text-align: left; background: var(--bg-1); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px 22px; cursor: pointer; transition: all 0.18s; break-inside: avoid; }
+.ps-card:hover { border-color: var(--line-2); background: #141418; transform: translateY(-1px); }
+.ps-label { display: inline-flex; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-4); padding: 0 0 10px 0; }
 .ps-text { font-family: var(--serif); font-style: italic; font-size: 22px; line-height: 1.3; color: var(--text-2); letter-spacing: -0.01em; }
 .ps-card:hover .ps-text { color: var(--text-1); }
 .explore-gallery-grid { column-count: 4; column-gap: 10px; }

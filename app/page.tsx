@@ -130,77 +130,77 @@ const DEFAULT_BRANDS: Brand[] = [
   { id: 'plume', name: 'Plume Studio', logoText: 'Plume', palette: ['#FFE5EC','#FF7AA2','#5B1339','#FFFFFF'], voice: 'Playful, bold, expressive.', edited: '3d ago', keywords: ['soft pinks','high contrast','paper textures'], samples: ['grad-2','grad-5','grad-8'] },
 ];
 
-const PROMPT_SUGGESTIONS: { label: string; prompt: string; hl: string[] }[] = [
+const PROMPT_SUGGESTIONS: { label: string; prompt: string; hero: string }[] = [
   {
-    label: 'Product Hero',
-    prompt: 'Studio product hero shot on clean white background, soft dramatic lighting, logo faithfully rendered, commercial grade sharpness and detail',
-    hl: ['product hero shot', 'logo faithfully rendered', 'commercial grade'],
+    label: 'Hard Light',
+    prompt: 'Single hard light source, sharp cast shadow, clinical white background. Nothing hidden. The object earns every pixel.',
+    hero: 'hard light',
   },
   {
-    label: 'Lifestyle',
-    prompt: 'Authentic lifestyle moment — person naturally interacting with the product, golden hour light, editorial candid feel, brand palette visible',
-    hl: ['lifestyle moment', 'golden hour', 'editorial candid'],
+    label: 'Golden Hour',
+    prompt: 'Backlit against a warm blown-out sky. Silhouette rim glow, cinematic lens flare at the edge. Shallow depth of field, dreamy and saturated — the kind of light that makes anything look like it matters.',
+    hero: 'backlit',
   },
   {
-    label: 'Campaign Hero',
-    prompt: 'Campaign hero image — bold cinematic wide composition, dramatic lighting, brand colors as the visual anchor, no text overlay',
-    hl: ['campaign hero', 'cinematic', 'brand colors'],
+    label: 'Overhead',
+    prompt: 'Flat lay, top-down, one surface. Long graphic shadows from a single hard source. Negative space does the work.',
+    hero: 'top-down',
   },
   {
-    label: 'Flat Lay',
-    prompt: 'Editorial flat lay — product arranged on marble surface with minimal props, overhead angle, brand palette accents, natural diffused light',
-    hl: ['flat lay', 'overhead angle', 'brand palette'],
+    label: 'Macro',
+    prompt: 'So close the surface becomes abstract. Grain, weave, pore, edge. No context — pure material.',
+    hero: 'abstract',
   },
   {
-    label: 'Person + Product',
-    prompt: 'Person using the product in a real everyday setting — shallow depth of field, natural light, no full face, lifestyle editorial tone',
-    hl: ['shallow depth of field', 'natural light', 'lifestyle editorial'],
+    label: 'Wide Environmental',
+    prompt: 'Subject deliberately small in frame. Architecture or landscape fills the composition. The world it lives in matters as much as the object itself — scale, atmosphere, belonging.',
+    hero: 'small in frame',
   },
   {
-    label: 'Brand Mood',
-    prompt: 'Abstract brand mood image — close-up macro of material textures and surfaces, brand palette tones throughout, no product needed',
-    hl: ['brand mood', 'macro', 'brand palette'],
+    label: 'Window Light',
+    prompt: 'Overcast north window, soft and directionless. No harsh shadows. Still life tradition, modern restraint. Linen or aged wood surface.',
+    hero: 'soft',
   },
   {
     label: 'Story Vertical',
-    prompt: 'Vertical 9:16 story format — bold minimal composition, top third left clear for text overlay, brand accent color as key visual element',
-    hl: ['9:16 story format', 'text overlay', 'brand accent'],
+    prompt: '9:16, bold graphic crop. Object at the bottom third, top half open and breathing. Built for the scroll.',
+    hero: '9:16',
   },
   {
-    label: 'Group Scene',
-    prompt: 'Group of people genuinely enjoying the product — outdoor sunny setting, vibrant energy, brand colors woven naturally into the scene',
-    hl: ['brand colors', 'outdoor sunny'],
+    label: 'Cinematic',
+    prompt: 'Widescreen 2.39:1 letterbox. Muted film grade, gentle grain, practical lighting only. Like a single frame lifted from a slow-cinema film — object placed with intention, not urgency. A quiet mood that rewards attention.',
+    hero: 'letterbox',
   },
   {
-    label: 'Product Detail',
-    prompt: 'Extreme close-up of product surface or material texture — rich macro photography, brand palette tones, almost abstract in its beauty',
-    hl: ['close-up', 'macro photography', 'brand palette'],
+    label: 'After Dark',
+    prompt: 'Neon or tungsten practical light, deep shadow, colour cast. Imperfect exposure. Urban, a little raw, genuinely alive.',
+    hero: 'neon',
   },
   {
-    label: 'Holiday Campaign',
-    prompt: 'Festive holiday scene with the product as hero — warm cozy atmosphere, seasonal color palette, gift-ready editorial styling',
-    hl: ['holiday scene', 'gift-ready', 'seasonal color'],
+    label: 'Double Exposure',
+    prompt: 'Product form layered with botanical or architectural texture. Tones bleeding through, painterly and surreal. Still unmistakably commercial — the tension between the two is the image.',
+    hero: 'layered',
   },
   {
-    label: 'Storefront Mood',
-    prompt: 'Cozy independent shop or studio interior — warm inviting atmosphere, brand aesthetic woven throughout the space, no people',
-    hl: ['shop or studio interior', 'brand aesthetic'],
+    label: 'Monochrome',
+    prompt: 'Strip the colour, keep the form. High contrast or barely-there tones — your call. Shape and light are everything now.',
+    hero: 'monochrome',
   },
   {
-    label: 'Social Square',
-    prompt: 'Instagram-ready square post — product as the undeniable hero, vibrant brand palette, thumb-stopping composition, zero distractions',
-    hl: ['instagram-ready', 'brand palette', 'thumb-stopping'],
+    label: 'Candid',
+    prompt: 'Fast, imperfect, real. Motion blur acceptable. The moment matters more than the setup. Feels found, not staged.',
+    hero: 'imperfect',
   },
 ];
 
-function highlightText(text: string, words: string[]): React.ReactNode {
-  if (!words.length) return text;
-  const escaped = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const pattern = new RegExp(`(${escaped.join('|')})`, 'gi');
+function highlightText(text: string, hero: string): React.ReactNode {
+  if (!hero) return text;
+  const escaped = hero.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(${escaped})`, 'gi');
   const parts = text.split(pattern);
-  const wl = words.map(w => w.toLowerCase());
+  const hl = hero.toLowerCase();
   return parts.map((p, i) =>
-    wl.includes(p.toLowerCase()) ? <span key={i} className="prompt-hl">{p}</span> : p
+    p.toLowerCase() === hl ? <span key={i} className="prompt-hl">{p}</span> : p
   );
 }
 
@@ -824,7 +824,7 @@ function PromptSection({ onSelect, onBack }: { onSelect: (p: string) => void; on
         {PROMPT_SUGGESTIONS.map((s, i) => (
           <button key={i} className="ps-card" onClick={() => onSelect(s.prompt)}>
             <span className="ps-label">{s.label}</span>
-            <p className="ps-text">{highlightText(s.prompt, s.hl)}</p>
+            <p className="ps-text">{highlightText(s.prompt, s.hero)}</p>
           </button>
         ))}
       </div>
@@ -913,7 +913,7 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
         {PROMPT_SUGGESTIONS.slice(0, 3).map((s, i) => (
           <button key={i} className="prompt-chip" onClick={() => setPrompt(s.prompt)}>
             <span className="chip-cat">{s.label}</span>
-            <span className="chip-text">{s.prompt.split('—')[0].trim().replace(/,$/, '')}</span>
+            <span className="chip-text">{s.prompt.length > 42 ? s.prompt.slice(0, 40) + '…' : s.prompt}</span>
           </button>
         ))}
         <button className="prompt-chip prompt-chip-more" onClick={() => setShowGallery(v => !v)}>
