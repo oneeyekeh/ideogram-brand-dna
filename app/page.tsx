@@ -77,6 +77,8 @@ interface SavedImage {
   brandName?: string;
 }
 
+type ImageFeedback = Record<string, 'up' | 'down'>;
+
 // ── SVG Icon ──────────────────────────────────────────────────────────────────
 
 const paths: Record<string, React.ReactNode> = {
@@ -417,6 +419,7 @@ function Sidebar({ page, setPage }: {
         <div className="sb-name">ideogram</div>
       </div>
       {item('explore','explore','Explore')}
+      {item('sessions','layers','Session history')}
       {item('batch','grid','Batch')}
       <div className="sb-section">Library</div>
       {item('images','image2','My images')}
@@ -745,6 +748,8 @@ function GenerationTraceCard({ trace, error, onDebug }: {
   const palette = trace.palette.slice(0, 5);
   const steps = [
     { label: 'Prompt', value: trace.prompt },
+    { label: 'Status', value: statusLabel },
+    { label: 'Model', value: trace.modelName },
     { label: 'Campaign', value: trace.campaignType ?? 'Classifying with Gemini Flash' },
     { label: 'Brand', value: trace.brandName ?? 'No Brand DNA selected' },
     { label: 'Logo', value: trace.hasLogo ? 'Official logo attached and prioritized' : 'No logo attached' },
@@ -773,13 +778,15 @@ function GenerationTraceCard({ trace, error, onDebug }: {
         </button>
         <span className="trace-status-dot"/>
       </div>
-      <div className="trace-compact">
-        <span>{trace.brandName ?? 'No brand'}</span>
-        <span>{trace.hasLogo ? 'logo' : 'no logo'}</span>
-        <span>{trace.referenceCount} refs</span>
-        <span>{trace.campaignType ?? 'classifying'}</span>
-        <span>{trace.modelName}</span>
-      </div>
+      {!expanded && (
+        <div className="trace-compact">
+          <span>{trace.brandName ?? 'No brand'}</span>
+          <span>{trace.hasLogo ? 'logo' : 'no logo'}</span>
+          <span>{trace.referenceCount} refs</span>
+          <span>{trace.campaignType ?? 'classifying'}</span>
+          <span>{trace.modelName}</span>
+        </div>
+      )}
       {expanded && (
         <div className="trace-list">
           {steps.map(step => (
@@ -826,8 +833,14 @@ function DebugMarkdownCanvas({ doc, onClose }: { doc: DebugDocState; onClose: ()
   );
 }
 
-function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail, debugDoc, setDebugDoc }: {
+function feedbackKey(msgIndex: number, imgIndex: number) {
+  return `${msgIndex}:${imgIndex}`;
+}
+
+function ExploreResults({ stream, imageFeedback, onRateImage, onRegenerate, onRefine, onOpenDetail, debugDoc, setDebugDoc }: {
   stream: StreamMessage[];
+  imageFeedback: ImageFeedback;
+  onRateImage: (key: string, value: 'up' | 'down') => void;
   onRegenerate: (msg: StreamMessage) => void;
   onRefine: (msg: StreamMessage, state: RefineState) => void;
   onOpenDetail: (msg: StreamMessage, imgIdx: number) => void;
@@ -871,6 +884,22 @@ function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail, debugDoc
                 : (m.images ?? []).slice(0,2).map((src,j)=>(
                     <div key={j} className="tile" onClick={()=>onOpenDetail(m,j)}>
                       <img src={src} alt="" className="tile-img"/>
+                      <div className="tile-feedback" onClick={e=>e.stopPropagation()}>
+                        <button
+                          className={`feedback-btn ${imageFeedback[feedbackKey(i, j)] === 'up' ? 'active' : ''}`}
+                          onClick={() => onRateImage(feedbackKey(i, j), 'up')}
+                          aria-label="Mark image useful"
+                        >
+                          <Icon name="thumbUp" size={12}/>
+                        </button>
+                        <button
+                          className={`feedback-btn ${imageFeedback[feedbackKey(i, j)] === 'down' ? 'active down' : ''}`}
+                          onClick={() => onRateImage(feedbackKey(i, j), 'down')}
+                          aria-label="Mark image not useful"
+                        >
+                          <Icon name="thumbDown" size={12}/>
+                        </button>
+                      </div>
                       <div className="tile-actions">
                         <a href={src} download={`gen-${i}-${j}.png`} className="tile-act" onClick={e=>e.stopPropagation()}>
                           <Icon name="download" size={12}/>
@@ -931,7 +960,7 @@ function PromptSection({ onSelect }: { onSelect: (p: string) => void }) {
 
 function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPrompt, onSend,
   activePreset, setPreset, openCreateBrand, stream, onRegenerate, onRefine,
-  onOpenDetail, attached, setAttached, onReset, debugDoc, setDebugDoc }: {
+  onOpenDetail, imageFeedback, onRateImage, attached, setAttached, onReset, debugDoc, setDebugDoc }: {
   brand: Brand | null; brands: Brand[]; activeBrand: string | null;
   setActiveBrand: (id: string | null) => void;
   prompt: string; setPrompt: (v: string) => void; onSend: (prompt: string) => void;
@@ -941,6 +970,8 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
   onRegenerate: (msg: StreamMessage) => void;
   onRefine: (msg: StreamMessage, state: RefineState) => void;
   onOpenDetail: (msg: StreamMessage, imgIdx: number) => void;
+  imageFeedback: ImageFeedback;
+  onRateImage: (key: string, value: 'up' | 'down') => void;
   attached: AttachedImage[]; setAttached: React.Dispatch<React.SetStateAction<AttachedImage[]>>;
   onReset: () => void;
   debugDoc: DebugDocState | null;
@@ -1000,7 +1031,8 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
         </div>
 
         {/* Right: results */}
-        <ExploreResults stream={stream} onRegenerate={onRegenerate} onRefine={onRefine}
+        <ExploreResults stream={stream} imageFeedback={imageFeedback} onRateImage={onRateImage}
+          onRegenerate={onRegenerate} onRefine={onRefine}
           onOpenDetail={onOpenDetail} debugDoc={debugDoc} setDebugDoc={setDebugDoc}/>
       </div>
     );
@@ -1420,6 +1452,63 @@ function ImagesPage({ images, onOpen }: { images: SavedImage[]; onOpen: (img: Sa
   );
 }
 
+function SessionHistoryPage({ stream, imageFeedback, onOpenExplore }: {
+  stream: StreamMessage[];
+  imageFeedback: ImageFeedback;
+  onOpenExplore: () => void;
+}) {
+  const runs = stream.map((m, i) => ({ m, i })).filter(({ m }) => m.role === 'asst' && (m.prompt || m.trace));
+  const up = Object.values(imageFeedback).filter(v => v === 'up').length;
+  const down = Object.values(imageFeedback).filter(v => v === 'down').length;
+
+  return (
+    <div className="session-page">
+      <div className="session-head">
+        <div>
+          <h1>Session history</h1>
+          <p>Review prompts, model responses, and image usefulness for this run.</p>
+        </div>
+        <button className="btn" onClick={onOpenExplore}><Icon name="explore" size={13}/> Back to Explore</button>
+      </div>
+      <div className="session-stats">
+        <div><strong>{runs.length}</strong><span>runs</span></div>
+        <div><strong>{up}</strong><span>useful</span></div>
+        <div><strong>{down}</strong><span>not useful</span></div>
+      </div>
+      <div className="session-list">
+        {runs.length === 0 && <div className="session-empty">No generations yet. Start in Explore, then come back here for the report.</div>}
+        {runs.map(({ m, i }) => {
+          const images = m.images ?? [];
+          const useful = images.filter((_, j) => imageFeedback[feedbackKey(i, j)] === 'up').length;
+          const notUseful = images.filter((_, j) => imageFeedback[feedbackKey(i, j)] === 'down').length;
+          return (
+            <div key={i} className="session-run">
+              <div className="session-run-main">
+                <div className="session-run-title">{m.trace?.campaignType ?? 'Campaign run'}</div>
+                <div className="session-run-prompt">{m.prompt ?? m.trace?.prompt ?? 'Generation pending'}</div>
+                <div className="session-run-meta">
+                  <span>{m.trace?.modelName ?? 'model pending'}</span>
+                  <span>{m.trace?.brandName ?? 'No brand'}</span>
+                  <span>{images.length} images</span>
+                </div>
+                {m.trace?.decisionLog?.length ? (
+                  <div className="session-run-log">
+                    {m.trace.decisionLog.slice(0, 4).map((item, idx) => <span key={idx}>{item}</span>)}
+                  </div>
+                ) : null}
+              </div>
+              <div className="session-run-score">
+                <div><Icon name="thumbUp" size={13}/> {useful}</div>
+                <div><Icon name="thumbDown" size={13}/> {notUseful}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Placeholder ───────────────────────────────────────────────────────────────
 
 const PLACEHOLDER_LABEL: Record<string,string> = {
@@ -1464,8 +1553,17 @@ export default function App() {
   const [debugDoc, setDebugDoc] = useState<DebugDocState | null>(null);
   const [attached, setAttached] = useState<AttachedImage[]>([]);
   const [savedImages, setSavedImages] = useState<SavedImage[]>([]);
+  const [imageFeedback, setImageFeedback] = useState<ImageFeedback>({});
 
   const brand = brands.find(b => b.id === activeBrand) ?? null;
+  const rateImage = useCallback((key: string, value: 'up' | 'down') => {
+    setImageFeedback(prev => {
+      const next = { ...prev };
+      if (next[key] === value) delete next[key];
+      else next[key] = value;
+      return next;
+    });
+  }, []);
 
   const generateImages = useCallback(async (
     userPrompt: string, msgIdx: number, attachedRefs: AttachedImage[]
@@ -1652,6 +1750,8 @@ export default function App() {
             onRegenerate={handleRegenerate}
             onRefine={handleRefine}
             onOpenDetail={(msg, imgIdx) => setDetail({ images: msg.images??[], idx: imgIdx, prompt: msg.prompt??'', brand: brand??undefined })}
+            imageFeedback={imageFeedback}
+            onRateImage={rateImage}
             attached={attached} setAttached={setAttached}
             onReset={() => { setStream([]); setDebugDoc(null); }}
             debugDoc={debugDoc}
@@ -1661,6 +1761,10 @@ export default function App() {
 
         {page === 'brands' && (
           <BrandsPage brands={brands} activeBrand={activeBrand} setActiveBrand={setActiveBrand} onCreate={startCreate} onEdit={startEdit}/>
+        )}
+
+        {page === 'sessions' && (
+          <SessionHistoryPage stream={stream} imageFeedback={imageFeedback} onOpenExplore={() => setPage('explore')}/>
         )}
 
         {page === 'editor' && (
