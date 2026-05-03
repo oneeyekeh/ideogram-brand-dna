@@ -11,6 +11,7 @@ const IMAGE_GENERATION_MODELS = [
   'gemini-2.5-flash-image',                    // Gemini 2.5 Flash Image ("Nano Banana 2") — primary
   'gemini-2.0-flash-preview-image-generation', // Gemini 2.0 Flash Image — fallback
 ];
+const TEXT_ANALYSIS_MODEL = 'gemini-2.5-flash';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -40,83 +41,26 @@ interface DebugInfo {
   fullPrompt: string;
   modelCandidates: string[];
   selectedModels: string[];
+  analysisModel?: string;
+  campaignType?: string;
+  decisionLog?: string[];
   assetManifest: Array<{ role: string; mimeType: string; bytesApprox: number }>;
   partLabels: string[];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// STEP 1 — Global quality standards
-//
-// Appended to every generation regardless of brand or preset.
-// These directives push the model toward commercial-grade output.
-// Tune the wording here to raise or lower the technical bar.
-// ─────────────────────────────────────────────────────────────────────────────
-const QUALITY_STANDARDS = `\
-━━━ TECHNICAL QUALITY REQUIREMENTS (mandatory for every output) ━━━
+interface CampaignAnalysis {
+  campaignType: string;
+  decisionLog: string[];
+}
 
-RESOLUTION & SHARPNESS:
-  • Maximum detail fidelity — render at the highest possible quality
-  • Tack-sharp focus on the hero subject with optically natural depth of field
-  • No soft edges from AI blur, no unintended motion blur, no halation
-
-PHOTOREALISM:
-  • Physically accurate materials: glass refracts light correctly, metal reflects
-    environment, fabric has micro-texture and weave detail, liquid has meniscus
-  • No AI tells: no melting geometry, no hallucinated reflections, no extra limbs
-  • Accurate product geometry: labels lie flat on curves, logos have correct perspective
-  • Text and logos must be crisp, readable, and intentionally placed when requested
-  • Physically plausible lighting — shadows and highlights obey a single light source
-
-EXPOSURE & COLOR SCIENCE:
-  • Full dynamic range: rich shadow detail without crush, highlights without blow-out
-  • Accurate white balance and color grading consistent throughout the frame
-  • No over-saturation, no unnatural glow, no HDR halo artifacts
-
-OUTPUT STANDARD:
-  • Commercial photography quality — suitable for print, large-format digital, campaigns
-  • Clean, noise-free result (add intentional film grain only if brand aesthetic demands it)
-  • No visual glitches, warping, stitching artifacts, or repeated patterns
-  • Composition follows rule of thirds or golden ratio; intentional, not accidental`;
-
-const CAMPAIGN_EXECUTION_GUIDE = `\
-━━━ CAMPAIGN EXECUTION GUIDE ━━━
-
-Classify the user's request into the closest campaign type and apply the matching constraints:
-
-PRODUCT SHOTS — highest reliability:
-  • Keep the product geometry clean, readable, and centered unless the user asks otherwise.
-  • For hero shots: simple background, realistic soft shadow, controlled studio lighting.
-  • For flat lays: top-down camera, tidy prop spacing, surface texture from prompt/reference.
-  • For variants: consistent scale, alignment, lighting, and palette across all products.
-  • Avoid random text. Render logo only when it belongs on the product/package/surface.
-
-CHARACTER + PRODUCT — medium difficulty:
-  • Prioritize natural hands, believable interaction, and product visibility.
-  • For full people: use candid lifestyle realism, not fashion-catalog stiffness.
-  • For hands close-ups: avoid face generation, keep hands anatomically plausible.
-  • Keep the product and logo legible; do not let the person overwhelm the product.
-
-APPAREL / WEARABLES — hardest:
-  • Preserve garment silhouette, fabric behavior, seams, scale, and fit.
-  • For on-model apparel: clean pose, full garment visible, no warped limbs or extra fingers.
-  • Prefer simpler compositions for reliability; flat lay is more reliable than on-model.
-  • For shoes/accessories: emphasize side angle, material texture, and product shape accuracy.
-
-SEASONAL / PROMO CAMPAIGNS:
-  • Use seasonal props and lighting as context, but preserve explicit Brand DNA first.
-  • Do not add sale text, slogans, prices, or dates unless the user explicitly requests text.
-  • Leave intentional negative space when prompt asks for banners, overlays, or text-safe areas.
-
-BRAND ATMOSPHERE / NO PRODUCT:
-  • If no product is needed, express the brand through palette, tone, lighting, texture, location,
-    typography feel, and art direction inferred from Brand DNA and references.
-  • Avoid inventing products or logos when the prompt asks only for mood, texture, or location.
-
-SOCIAL FORMAT SPECIFIC:
-  • Square post: strong central read, simple shapes, works at thumbnail size.
-  • Vertical 9:16: clear subject, top/bottom text-safe space, simple background hierarchy.
-  • Wide banner: horizontal composition, product or focal subject on one side, negative space
-    for headline, professional crop-safe framing.`;
+const FALLBACK_ANALYSIS: CampaignAnalysis = {
+  campaignType: 'General campaign image',
+  decisionLog: [
+    'Read the user prompt as the primary creative task.',
+    'Apply Brand DNA first, then use references only to fill missing visual cues.',
+    'Keep output campaign-ready without adding hidden preset constraints.',
+  ],
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STEP 2 — Brand context block
@@ -281,6 +225,7 @@ function buildFullPrompt(
   _preset: string | null | undefined,
   hasLogo: boolean,
   refCount: number,
+  analysis: CampaignAnalysis,
 ): string {
   const sections: string[] = [];
 
@@ -288,17 +233,68 @@ function buildFullPrompt(
     sections.push(buildBrandContext(brand, hasLogo, refCount));
   }
 
-  sections.push(QUALITY_STANDARDS);
-  sections.push(CAMPAIGN_EXECUTION_GUIDE);
+  sections.push(
+    '━━━ CAMPAIGN CLASSIFICATION ━━━\n' +
+    `Campaign type: ${analysis.campaignType}\n` +
+    'Use this classification as lightweight planning context only. Do not override the user prompt or explicit Brand DNA.'
+  );
 
   sections.push(
     '━━━ GENERATION TASK ━━━\n' +
-    'Apply ALL brand rules, style direction, and quality requirements above.\n\n' +
+    'Apply the Brand DNA, user prompt, and attached references with commercial-quality composition and realistic detail.\n\n' +
     'Generate: ' + userPrompt.trim() + '\n\n' +
-    'This output must be publication-ready. No compromises on quality or brand fidelity.'
+    'This output should be publication-ready, brand-faithful, and free of unintended artifacts or unsolicited text.'
   );
 
   return sections.join('\n\n');
+}
+
+async function analyzeCampaign(
+  apiKey: string,
+  prompt: string,
+  brand: BrandDNA | null | undefined,
+  refCount: number,
+  hasLogo: boolean,
+): Promise<CampaignAnalysis> {
+  const text = [
+    'Classify this image-generation request for internal logging.',
+    'Return JSON only with keys: campaignType (short label) and decisionLog (3 to 5 short strings).',
+    'Do not write a generation prompt. Do not add constraints. This is only for debugging and user-visible logs.',
+    '',
+    `Prompt: ${prompt}`,
+    `Brand: ${brand?.name ?? 'none'}`,
+    `Brand voice: ${brand?.voice || 'not specified'}`,
+    `Palette: ${brand?.palette?.join(', ') || 'not specified'}`,
+    `Logo attached: ${hasLogo ? 'yes' : 'no'}`,
+    `Reference image count: ${refCount}`,
+  ].join('\n');
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${TEXT_ANALYSIS_MODEL}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text }] }],
+          generationConfig: { responseMimeType: 'application/json' },
+        }),
+      },
+    );
+    if (!res.ok) return FALLBACK_ANALYSIS;
+    const json = await res.json();
+    const raw = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const parsed = raw ? JSON.parse(raw) : null;
+    const campaignType = typeof parsed?.campaignType === 'string' && parsed.campaignType.trim()
+      ? parsed.campaignType.trim()
+      : FALLBACK_ANALYSIS.campaignType;
+    const decisionLog = Array.isArray(parsed?.decisionLog)
+      ? parsed.decisionLog.filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0).slice(0, 5)
+      : FALLBACK_ANALYSIS.decisionLog;
+    return { campaignType, decisionLog: decisionLog.length ? decisionLog : FALLBACK_ANALYSIS.decisionLog };
+  } catch {
+    return FALLBACK_ANALYSIS;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -466,14 +462,18 @@ export async function POST(req: NextRequest) {
 
   const hasLogo = !!logoImage;
   const refCount = Math.min(referenceImages.length, 5);
+  const analysis = await analyzeCampaign(apiKey, prompt.trim(), brand, refCount, hasLogo);
 
   // Build parts once — reused for both parallel generation calls
-  const fullPrompt = buildFullPrompt(prompt.trim(), brand, preset, hasLogo, refCount);
+  const fullPrompt = buildFullPrompt(prompt.trim(), brand, preset, hasLogo, refCount, analysis);
   const parts = buildApiParts(fullPrompt, prompt.trim(), referenceImages, brand, logoImage);
   const debug: DebugInfo = {
     fullPrompt,
     modelCandidates: IMAGE_GENERATION_MODELS,
     selectedModels: [],
+    analysisModel: TEXT_ANALYSIS_MODEL,
+    campaignType: analysis.campaignType,
+    decisionLog: analysis.decisionLog,
     assetManifest: [
       ...(logoImage ? [{ role: 'Brand logo', mimeType: logoImage.mimeType, bytesApprox: Math.round(logoImage.data.length * 0.75) }] : []),
       ...referenceImages.slice(0, 5).map((img, i) => ({

@@ -98,24 +98,20 @@ input, textarea { font: inherit; color: inherit; background: none; border: none;
 .prompt-chip-more:hover { color: var(--text-1); border-color: var(--accent); background: var(--accent-soft); border-style: dashed; }
 
 /* Composer settings panel */
-.composer-settings { position: absolute; top: calc(100% + 8px); right: 0; background: #1E1E22; border: 1px solid var(--line-2); border-radius: 16px; overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,0.6); width: 320px; z-index: 30; }
-.cs-head { display: flex; align-items: center; justify-content: space-between; padding: 11px 16px 10px; border-bottom: 1px solid var(--line); }
-.cs-head span { font-size: 12px; color: var(--text-2); font-weight: 500; }
+.composer-settings { position: absolute; top: calc(100% + 8px); right: 0; background: #1E1E22; border: 1px solid var(--line-2); border-radius: 16px; overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,0.6); width: min(520px, calc(100vw - 40px)); z-index: 80; }
+.composer-settings.compact-menu { top: auto; bottom: calc(100% + 8px); right: auto; left: 0; width: min(520px, calc(100vw - 32px)); }
+.cs-head { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px 12px; border-bottom: 1px solid var(--line); }
+.cs-head span { font-size: 13px; color: var(--text-1); font-weight: 600; }
 .cs-reset { font-size: 11.5px; color: var(--text-4); padding: 3px 8px; border-radius: 6px; }
 .cs-reset:hover { color: var(--text-2); background: var(--bg-3); }
-.cs-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 16px; border-bottom: 1px solid var(--line); }
+.cs-row { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
 .cs-row:last-child { border-bottom: none; }
-.cs-row-main { display: flex; flex-direction: column; gap: 5px; min-width: 96px; }
 .cs-row-label { font-size: 13px; color: var(--text-2); }
-.cs-enable { align-self: flex-start; padding: 2px 7px; border-radius: 100px; font-size: 10px; color: var(--text-4); background: var(--bg-2); border: 1px solid var(--line); text-transform: uppercase; letter-spacing: 0.06em; }
-.cs-enable.active { color: var(--accent-text); background: var(--accent-soft); border-color: rgba(124,92,255,0.42); }
-.cs-row-btns { display: flex; background: var(--bg-3); border-radius: 8px; padding: 2px; gap: 1px; }
-.cs-row-btns.disabled { opacity: 0.48; }
-.cs-opt { padding: 4px 10px; border-radius: 6px; font-size: 12px; color: var(--text-3); transition: all 0.12s; white-space: nowrap; }
+.cs-row-btns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--bg-3); border-radius: 10px; padding: 3px; gap: 2px; min-width: 0; }
+.cs-opt { min-width: 0; padding: 6px 8px; border-radius: 7px; font-size: 12px; color: var(--text-3); transition: all 0.12s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cs-opt:hover { color: var(--text-2); }
-.cs-opt.active { background: var(--bg-1); color: var(--text-1); box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
-.cs-opt:disabled { cursor: default; }
-.cs-opt:disabled:hover { color: var(--text-3); }
+.cs-opt.active { background: var(--accent); color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+.cs-opt.active.neutral { background: var(--bg-1); color: var(--text-2); }
 
 /* Prompt section — inline flip of explore gallery */
 
@@ -281,6 +277,8 @@ input, textarea { font: inherit; color: inherit; background: none; border: none;
 .trace-step-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-4); }
 .trace-step-value { font-size: 12px; line-height: 1.35; color: var(--text-2); overflow-wrap: anywhere; }
 .trace-step:first-child .trace-step-value { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.trace-decision-log { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; padding-top: 8px; border-top: 1px solid var(--line); }
+.trace-decision-log div { font-size: 11.5px; line-height: 1.35; color: var(--text-3); }
 .trace-palette { display: flex; height: 12px; border-radius: 100px; overflow: hidden; margin-top: 12px; border: 1px solid var(--line); }
 .trace-palette span { flex: 1; }
 .trace-ref-names { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }

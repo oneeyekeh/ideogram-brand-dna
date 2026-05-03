@@ -46,6 +46,8 @@ interface GenerationTrace {
   referenceCount: number;
   referenceNames: string[];
   modelName: string;
+  campaignType?: string;
+  decisionLog?: string[];
   debugMarkdown?: string;
 }
 
@@ -141,20 +143,20 @@ interface PromptPreset {
 const PRESET_CATEGORIES = ['Social Media', 'Product', 'Campaign', 'Brand Storytelling'];
 
 const PROMPT_SUGGESTIONS: PromptPreset[] = [
-  { id: 'instagram_feed', category: 'Social Media', label: 'Instagram Feed Post', prompt: 'Square lifestyle product shot, styled and polished, scroll-stopping composition, no text' },
-  { id: 'instagram_story', category: 'Social Media', label: 'Instagram Story / Reel Cover', prompt: 'Vertical 9:16, subject in lower third, top half open for text overlay, no text' },
-  { id: 'facebook_cover', category: 'Social Media', label: 'Facebook Event Cover', prompt: 'Wide horizontal 16:9, energetic and inviting, event or promotion feel, no text' },
-  { id: 'product_hero', category: 'Product', label: 'Clean Product Hero', prompt: 'Isolated product on clean background, professional studio lighting, sharp detail, no text' },
-  { id: 'product_in_use', category: 'Product', label: 'Product In Use', prompt: 'Person naturally using or holding the product, candid and authentic, shallow depth of field, no text' },
-  { id: 'product_flatlay', category: 'Product', label: 'Product Flat Lay', prompt: 'Overhead top-down arrangement, product with complementary props on a clean surface, editorial composition, no text' },
-  { id: 'product_apparel', category: 'Product', label: 'Apparel / Wearable on Model', prompt: 'Clothing or accessory worn by a model, full or half body, clean background, no text' },
-  { id: 'product_shoe_bag', category: 'Product', label: 'Shoe / Bag Hero', prompt: 'Single accessory product shot, side or three-quarter angle, surface with texture, dramatic lighting, no text' },
-  { id: 'sale_promo', category: 'Campaign', label: 'Sale / Promo', prompt: 'Bold high-energy composition, product as hero, generous negative space for text overlay, no text' },
-  { id: 'seasonal', category: 'Campaign', label: 'Seasonal / Holiday', prompt: 'Product in a seasonal setting with contextual atmosphere and props, warm and editorial, no text' },
-  { id: 'new_arrival', category: 'Campaign', label: 'New Arrival / Launch', prompt: 'Product as absolute hero, clean elevated composition, sense of newness and premium quality, no text' },
-  { id: 'behind_scenes', category: 'Brand Storytelling', label: 'Behind the Scenes', prompt: 'Hands at work, craft or process visible, documentary feel, authentic and human, no text' },
-  { id: 'lifestyle_aspirational', category: 'Brand Storytelling', label: 'Lifestyle / Aspirational', prompt: 'Atmosphere and feeling over literal product, editorial and evocative, no hard product focus, no text' },
-  { id: 'customer_moment', category: 'Brand Storytelling', label: 'Customer Moment', prompt: 'Candid scene of a happy customer enjoying the product, warm and relatable, genuine and human, no text' },
+  { id: 'instagram_feed', category: 'Social Media', label: 'Instagram Feed Post', prompt: 'Square lifestyle product shot, styled and polished, strong thumbnail composition, brand-aware art direction' },
+  { id: 'instagram_story', category: 'Social Media', label: 'Instagram Story / Reel Cover', prompt: 'Vertical 9:16 social image, clear subject hierarchy, text-safe space at the top and bottom' },
+  { id: 'facebook_cover', category: 'Social Media', label: 'Facebook / LinkedIn Banner', prompt: 'Wide horizontal brand image, professional composition, focal subject on one side with clean negative space' },
+  { id: 'product_hero', category: 'Product', label: 'Clean Product Hero', prompt: 'Studio product hero shot on a clean background, soft shadow, crisp product geometry, professional lighting' },
+  { id: 'product_in_use', category: 'Product', label: 'Product In Use', prompt: 'Product being used naturally in an everyday setting, candid lifestyle realism, shallow depth of field' },
+  { id: 'product_flatlay', category: 'Product', label: 'Product Flat Lay', prompt: 'Top-down flat lay with the product and complementary props on a clean textured surface, editorial spacing' },
+  { id: 'product_apparel', category: 'Product', label: 'Apparel / Wearable', prompt: 'Fashion or wearable product presentation with clean styling, visible silhouette, material texture, editorial lighting' },
+  { id: 'product_shoe_bag', category: 'Product', label: 'Shoe / Bag Hero', prompt: 'Single accessory hero shot, side or three-quarter angle, tactile surface, dramatic but realistic lighting' },
+  { id: 'sale_promo', category: 'Campaign', label: 'Sale / Promo', prompt: 'Bold promotional campaign visual with the product as hero, energetic composition, clean space for optional overlay' },
+  { id: 'seasonal', category: 'Campaign', label: 'Seasonal / Holiday', prompt: 'Seasonal campaign scene featuring the product with contextual props, warm atmosphere, brand-led styling' },
+  { id: 'new_arrival', category: 'Campaign', label: 'New Arrival / Launch', prompt: 'Launch campaign image with elevated composition, premium product focus, sense of freshness and momentum' },
+  { id: 'behind_scenes', category: 'Brand Storytelling', label: 'Behind the Scenes', prompt: 'Authentic behind-the-scenes scene showing craft, process, or workspace, documentary feel, human detail' },
+  { id: 'lifestyle_aspirational', category: 'Brand Storytelling', label: 'Brand Mood / Vibe', prompt: 'Editorial lifestyle image matching the brand aesthetic, atmosphere and feeling first, no product required' },
+  { id: 'customer_moment', category: 'Brand Storytelling', label: 'Customer Moment', prompt: 'Candid customer moment around the product or brand experience, warm, relatable, genuine interaction' },
 ];
 
 interface BrandingMod {
@@ -167,7 +169,7 @@ interface BrandingMod {
   defaultOn: boolean;
 }
 
-type BrandingModState = Record<string, { enabled: boolean; value: boolean }>;
+type BrandingModState = Record<string, boolean | null>;
 
 const BRANDING_MODS: BrandingMod[] = [
   { id: 'logo',        label: 'Logo',          onLabel: 'Logo visible',    offLabel: 'No logo',          onTag: 'logo accurately rendered and visible',        offTag: 'no logo',                     defaultOn: false },
@@ -181,7 +183,7 @@ const BRANDING_MODS: BrandingMod[] = [
 
 function getDefaultBrandingMods(): BrandingModState {
   return Object.fromEntries(
-    BRANDING_MODS.map(m => [m.id, { enabled: false, value: m.defaultOn }])
+    BRANDING_MODS.map(m => [m.id, null])
   ) as BrandingModState;
 }
 
@@ -189,12 +191,12 @@ function buildPromptWithMods(base: string, mods: BrandingModState): string {
   const tags: string[] = [];
   for (const m of BRANDING_MODS) {
     const state = mods[m.id];
-    if (!state?.enabled) continue;
-    const tag = state.value ? m.onTag : m.offTag;
+    if (state === null || state === undefined) continue;
+    const tag = state ? m.onTag : m.offTag;
     if (tag) tags.push(tag);
   }
   return tags.length
-    ? `${base}. Brand modifier guidance, apply only where compatible with the selected preset: ${tags.join('; ')}.`
+    ? `${base}. Override settings: ${tags.join('; ')}.`
     : base;
 }
 
@@ -325,6 +327,9 @@ function formatDebugMarkdown(
     fullPrompt?: string;
     modelCandidates?: string[];
     selectedModels?: string[];
+    analysisModel?: string;
+    campaignType?: string;
+    decisionLog?: string[];
     assetManifest?: Array<{ role: string; mimeType: string; bytesApprox: number }>;
     partLabels?: string[];
   } | undefined,
@@ -345,6 +350,8 @@ function formatDebugMarkdown(
     error ? `- Error: ${error}` : '- Result: generation request completed',
     `- Selected model(s): ${selectedModels.join(', ')}`,
     `- Model fallback order: ${modelCandidates.join(' -> ')}`,
+    `- Analysis model: ${debug?.analysisModel ?? 'not returned'}`,
+    `- Campaign type: ${debug?.campaignType ?? 'not classified yet'}`,
     '',
     '## User Prompt',
     '```text',
@@ -362,6 +369,9 @@ function formatDebugMarkdown(
     '',
     '## API Part Labels',
     ...(debug?.partLabels?.length ? debug.partLabels.map(label => `- ${label}`) : ['- not returned']),
+    '',
+    '## Decision Log',
+    ...(debug?.decisionLog?.length ? debug.decisionLog.map(item => `- ${item}`) : ['- not returned']),
     '',
     '## Actual Prompt Sent To Model',
     '```text',
@@ -436,7 +446,7 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
-  const activeMods = BRANDING_MODS.filter(m => mods[m.id]?.enabled).length;
+  const activeMods = BRANDING_MODS.filter(m => mods[m.id] !== null && mods[m.id] !== undefined).length;
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
@@ -580,41 +590,32 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
         {/* More settings */}
         <div style={{position:'relative'}} ref={settingsRef}>
           <button className={`tool-pill ${settingsOpen || activeMods > 0 ? 'active' : ''}`}
-            onClick={() => setSettingsOpen(o => !o)} title="Branding settings">
+            onClick={() => setSettingsOpen(o => !o)} title="Override settings">
             <Icon name="sliders" size={11}/>
             {activeMods > 0 && <span className="tool-pill-badge">{activeMods}</span>}
           </button>
           {settingsOpen && (
-            <div className="composer-settings">
+            <div className={`composer-settings ${compact ? 'compact-menu' : ''}`}>
               <div className="cs-head">
-                <span>Branding settings</span>
+                <span>Override settings</span>
                 <button className="cs-reset" onClick={() => setMods(getDefaultBrandingMods())}>Reset</button>
               </div>
               {BRANDING_MODS.map(m => {
-                const state = mods[m.id] ?? { enabled: false, value: m.defaultOn };
+                const state = mods[m.id] ?? null;
                 return (
-                  <div key={m.id} className={`cs-row ${state.enabled ? 'enabled' : ''}`}>
-                    <div className="cs-row-main">
-                      <span className="cs-row-label">{m.label}</span>
-                      <button
-                        className={`cs-enable ${state.enabled ? 'active' : ''}`}
-                        onClick={() => setMods(p => ({
-                          ...p,
-                          [m.id]: { ...(p[m.id] ?? { value: m.defaultOn }), enabled: !(p[m.id]?.enabled ?? false) },
-                        }))}
-                      >
-                        {state.enabled ? 'Applied' : 'Apply'}
+                  <div key={m.id} className="cs-row">
+                    <span className="cs-row-label">{m.label}</span>
+                    <div className="cs-row-btns tri">
+                      <button className={`cs-opt ${state === null ? 'active neutral' : ''}`}
+                        onClick={() => setMods(p => ({...p, [m.id]: null}))}>
+                        Not set
                       </button>
-                    </div>
-                    <div className={`cs-row-btns ${state.enabled ? '' : 'disabled'}`}>
-                      <button className={`cs-opt ${state.value ? 'active' : ''}`}
-                        disabled={!state.enabled}
-                        onClick={() => setMods(p => ({...p, [m.id]: { enabled: true, value: true }}))}>
+                      <button className={`cs-opt ${state === true ? 'active' : ''}`}
+                        onClick={() => setMods(p => ({...p, [m.id]: true}))}>
                         {m.onLabel}
                       </button>
-                      <button className={`cs-opt ${!state.value ? 'active' : ''}`}
-                        disabled={!state.enabled}
-                        onClick={() => setMods(p => ({...p, [m.id]: { enabled: true, value: false }}))}>
+                      <button className={`cs-opt ${state === false ? 'active' : ''}`}
+                        onClick={() => setMods(p => ({...p, [m.id]: false}))}>
                         {m.offLabel ?? 'Off'}
                       </button>
                     </div>
@@ -734,12 +735,16 @@ function GenerationTraceCard({ trace, error, onDebug }: {
   const palette = trace.palette.slice(0, 5);
   const steps = [
     { label: 'Prompt', value: trace.prompt },
+    { label: 'Campaign', value: trace.campaignType ?? 'Classifying with Gemini Flash' },
     { label: 'Brand', value: trace.brandName ?? 'No Brand DNA selected' },
     { label: 'Logo', value: trace.hasLogo ? 'Official logo attached and prioritized' : 'No logo attached' },
     { label: 'Tone', value: trace.tone?.trim() || 'Infer tone from references and prompt' },
     { label: 'References', value: trace.referenceCount ? `${trace.referenceCount} campaign reference${trace.referenceCount === 1 ? '' : 's'} attached` : 'No references attached' },
-    { label: 'Priority', value: 'Brand DNA -> reference DNA -> user prompt scene -> quality pass' },
+    { label: 'Priority', value: 'User prompt -> Brand DNA -> logo -> reference DNA -> campaign type' },
   ];
+  const decisionLog = trace.decisionLog?.length
+    ? trace.decisionLog
+    : ['Gemini Flash log will appear after the request is classified.'];
 
   return (
     <div className={`trace-card ${trace.status}`}>
@@ -762,6 +767,7 @@ function GenerationTraceCard({ trace, error, onDebug }: {
         <span>{trace.brandName ?? 'No brand'}</span>
         <span>{trace.hasLogo ? 'logo' : 'no logo'}</span>
         <span>{trace.referenceCount} refs</span>
+        <span>{trace.campaignType ?? 'classifying'}</span>
         <span>{trace.modelName}</span>
       </div>
       {expanded && (
@@ -772,6 +778,9 @@ function GenerationTraceCard({ trace, error, onDebug }: {
               <div className="trace-step-value">{step.value}</div>
             </div>
           ))}
+          <div className="trace-decision-log">
+            {decisionLog.map((item, i) => <div key={`${item}-${i}`}>{item}</div>)}
+          </div>
         </div>
       )}
       {palette.length > 0 && (
@@ -1488,6 +1497,8 @@ export default function App() {
               ...(prevTrace ?? createGenerationTrace(userPrompt, currentBrand, attachedRefs, 'generate', 'error')),
               status: 'error',
               modelName: json.debug?.selectedModels?.[0] ?? prevTrace?.modelName ?? 'Gemini Flash Image',
+              campaignType: json.debug?.campaignType ?? prevTrace?.campaignType,
+              decisionLog: json.debug?.decisionLog ?? prevTrace?.decisionLog,
               debugMarkdown,
             },
           };
@@ -1503,6 +1514,8 @@ export default function App() {
       const cappedImages = images.slice(0, 2);
       const debugMarkdown = formatDebugMarkdown(userPrompt, currentBrand, attachedRefs, json.debug);
       const modelName = json.debug?.selectedModels?.[0] ?? 'Gemini Flash Image';
+      const campaignType = json.debug?.campaignType;
+      const decisionLog = json.debug?.decisionLog;
       setSavedImages(prev => [
         ...cappedImages.map((src, j) => ({
           id: `${Date.now()}-${j}`,
@@ -1522,8 +1535,8 @@ export default function App() {
           referenceImages: attachedRefs,
           variant: next[msgIdx]?.variant,
           trace: prevTrace
-            ? { ...prevTrace, status: 'complete', modelName, debugMarkdown }
-            : { ...createGenerationTrace(userPrompt, currentBrand, attachedRefs, 'generate', 'complete'), modelName, debugMarkdown },
+            ? { ...prevTrace, status: 'complete', modelName, campaignType, decisionLog, debugMarkdown }
+            : { ...createGenerationTrace(userPrompt, currentBrand, attachedRefs, 'generate', 'complete'), modelName, campaignType, decisionLog, debugMarkdown },
         };
         return next;
       });
