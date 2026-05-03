@@ -36,6 +36,14 @@ interface GenerateRequest {
   preset?: string | null;
 }
 
+interface DebugInfo {
+  fullPrompt: string;
+  modelCandidates: string[];
+  selectedModels: string[];
+  assetManifest: Array<{ role: string; mimeType: string; bytesApprox: number }>;
+  partLabels: string[];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // STEP 1 — Global quality standards
 //
@@ -340,7 +348,7 @@ function buildApiParts(
 async function generateOne(
   apiKey: string,
   parts: object[],
-): Promise<{ data: string; mimeType: string }> {
+): Promise<{ data: string; mimeType: string; model: string }> {
   let lastError: Error | null = null;
 
   for (const model of IMAGE_GENERATION_MODELS) {
@@ -378,7 +386,7 @@ async function generateOne(
 
     const imgPart = responseParts.find(p => p.inlineData?.data);
     if (imgPart?.inlineData) {
-      return { data: imgPart.inlineData.data, mimeType: imgPart.inlineData.mimeType };
+      return { data: imgPart.inlineData.data, mimeType: imgPart.inlineData.mimeType, model };
     }
 
     throw new Error(
@@ -421,6 +429,22 @@ export async function POST(req: NextRequest) {
   // Build parts once — reused for both parallel generation calls
   const fullPrompt = buildFullPrompt(prompt.trim(), brand, preset, hasLogo, refCount);
   const parts = buildApiParts(fullPrompt, prompt.trim(), referenceImages, brand, logoImage);
+  const debug: DebugInfo = {
+    fullPrompt,
+    modelCandidates: IMAGE_GENERATION_MODELS,
+    selectedModels: [],
+    assetManifest: [
+      ...(logoImage ? [{ role: 'Brand logo', mimeType: logoImage.mimeType, bytesApprox: Math.round(logoImage.data.length * 0.75) }] : []),
+      ...referenceImages.slice(0, 5).map((img, i) => ({
+        role: `Campaign reference ${i + 1}`,
+        mimeType: img.mimeType,
+        bytesApprox: Math.round(img.data.length * 0.75),
+      })),
+    ],
+    partLabels: parts
+      .filter((part): part is { text: string } => typeof (part as { text?: unknown }).text === 'string')
+      .map(part => part.text.split('\n')[0].slice(0, 120)),
+  };
 
   // Generate 2 images in parallel
   const [r1, r2] = await Promise.allSettled([
@@ -432,13 +456,16 @@ export async function POST(req: NextRequest) {
   const errors: string[] = [];
 
   for (const result of [r1, r2]) {
-    if (result.status === 'fulfilled') images.push(result.value);
+    if (result.status === 'fulfilled') {
+      images.push({ data: result.value.data, mimeType: result.value.mimeType });
+      debug.selectedModels.push(result.value.model);
+    }
     else errors.push(result.reason?.message ?? 'Unknown error');
   }
 
   if (images.length === 0) {
-    return NextResponse.json({ error: errors[0] ?? 'Generation failed' }, { status: 500 });
+    return NextResponse.json({ error: errors[0] ?? 'Generation failed', debug }, { status: 500 });
   }
 
-  return NextResponse.json({ images });
+  return NextResponse.json({ images, debug });
 }

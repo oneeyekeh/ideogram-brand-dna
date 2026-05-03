@@ -45,6 +45,13 @@ interface GenerationTrace {
   tone?: string;
   referenceCount: number;
   referenceNames: string[];
+  modelName: string;
+  debugMarkdown?: string;
+}
+
+interface DebugDocState {
+  title: string;
+  markdown: string;
 }
 
 interface DetailState {
@@ -271,7 +278,61 @@ function createGenerationTrace(
     tone: brand?.voice,
     referenceCount: refs.length,
     referenceNames: refs.map(ref => ref.name),
+    modelName: 'Gemini Flash Image',
   };
+}
+
+function formatDebugMarkdown(
+  prompt: string,
+  brand: Brand | null,
+  refs: AttachedImage[],
+  debug: {
+    fullPrompt?: string;
+    modelCandidates?: string[];
+    selectedModels?: string[];
+    assetManifest?: Array<{ role: string; mimeType: string; bytesApprox: number }>;
+    partLabels?: string[];
+  } | undefined,
+  error?: string,
+) {
+  const selectedModels = debug?.selectedModels?.length ? debug.selectedModels : ['not returned yet'];
+  const modelCandidates = debug?.modelCandidates ?? ['gemini-2.5-flash-image', 'gemini-2.0-flash-preview-image-generation'];
+  const assetRows = [
+    ...(brand?.logoImage ? [`- Brand logo: attached from Brand DNA`] : ['- Brand logo: none']),
+    ...refs.map((ref, i) => `- Reference ${i + 1}: ${ref.name} (${ref.mimeType})`),
+    ...(debug?.assetManifest ?? []).map(asset => `- Sent file: ${asset.role}, ${asset.mimeType}, ~${asset.bytesApprox} bytes`),
+  ];
+
+  return [
+    '# generation-debug.md',
+    '',
+    '## Status',
+    error ? `- Error: ${error}` : '- Result: generation request completed',
+    `- Selected model(s): ${selectedModels.join(', ')}`,
+    `- Model fallback order: ${modelCandidates.join(' -> ')}`,
+    '',
+    '## User Prompt',
+    '```text',
+    prompt,
+    '```',
+    '',
+    '## Brand DNA Input',
+    `- Brand: ${brand?.name ?? 'none'}`,
+    `- Logo attached: ${brand?.logoImage ? 'yes' : 'no'}`,
+    `- Tone / voice: ${brand?.voice || 'not specified'}`,
+    `- Palette: ${brand?.palette?.join(', ') || 'not specified'}`,
+    '',
+    '## Files / Image Parts',
+    ...assetRows,
+    '',
+    '## API Part Labels',
+    ...(debug?.partLabels?.length ? debug.partLabels.map(label => `- ${label}`) : ['- not returned']),
+    '',
+    '## Actual Prompt Sent To Model',
+    '```text',
+    debug?.fullPrompt ?? 'Prompt was not returned by the API.',
+    '```',
+  ].join('\n');
 }
 
 function useLocalStorage<T>(key: string, initial: T): [T, React.Dispatch<React.SetStateAction<T>>] {
@@ -552,7 +613,12 @@ function RefineForm({ onSubmit, onCancel }: {
   );
 }
 
-function GenerationTraceCard({ trace, error }: { trace: GenerationTrace; error?: string }) {
+function GenerationTraceCard({ trace, error, onDebug }: {
+  trace: GenerationTrace;
+  error?: string;
+  onDebug: (trace: GenerationTrace) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
   const modeLabel = trace.mode === 'refine' ? 'Refinement run' : trace.mode === 'regenerate' ? 'Regeneration run' : 'Generation run';
   const statusLabel = trace.status === 'generating' ? 'Generating' : trace.status === 'error' ? 'Needs attention' : 'Completed';
   const palette = trace.palette.slice(0, 5);
@@ -568,26 +634,42 @@ function GenerationTraceCard({ trace, error }: { trace: GenerationTrace; error?:
   return (
     <div className={`trace-card ${trace.status}`}>
       <div className="trace-top">
-        <div>
+        <button className="trace-summary" onClick={() => setExpanded(v => !v)}>
           <div className="trace-eyebrow">{modeLabel}</div>
           <div className="trace-title">{statusLabel}</div>
-        </div>
+        </button>
+        <button
+          className="trace-debug"
+          onClick={() => onDebug(trace)}
+          disabled={!trace.debugMarkdown}
+          title="Open internal prompt/debug markdown"
+        >
+          debug.md
+        </button>
         <span className="trace-status-dot"/>
       </div>
-      <div className="trace-list">
-        {steps.map(step => (
-          <div key={step.label} className="trace-step">
-            <div className="trace-step-label">{step.label}</div>
-            <div className="trace-step-value">{step.value}</div>
-          </div>
-        ))}
+      <div className="trace-compact">
+        <span>{trace.brandName ?? 'No brand'}</span>
+        <span>{trace.hasLogo ? 'logo' : 'no logo'}</span>
+        <span>{trace.referenceCount} refs</span>
+        <span>{trace.modelName}</span>
       </div>
+      {expanded && (
+        <div className="trace-list">
+          {steps.map(step => (
+            <div key={step.label} className="trace-step">
+              <div className="trace-step-label">{step.label}</div>
+              <div className="trace-step-value">{step.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
       {palette.length > 0 && (
         <div className="trace-palette">
           {palette.map((color, i) => <span key={`${color}-${i}`} style={{background: color}}/>)}
         </div>
       )}
-      {trace.referenceNames.length > 0 && (
+      {expanded && trace.referenceNames.length > 0 && (
         <div className="trace-ref-names">
           {trace.referenceNames.slice(0, 3).map(name => <span key={name}>{name}</span>)}
           {trace.referenceNames.length > 3 && <span>+{trace.referenceNames.length - 3} more</span>}
@@ -600,11 +682,28 @@ function GenerationTraceCard({ trace, error }: { trace: GenerationTrace; error?:
 
 // ── Explore active — right results panel ──────────────────────────────────────
 
-function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail }: {
+function DebugMarkdownCanvas({ doc, onClose }: { doc: DebugDocState; onClose: () => void }) {
+  return (
+    <div className="debug-canvas">
+      <div className="debug-head">
+        <div>
+          <div className="debug-kicker">Internal debug</div>
+          <h2>{doc.title}</h2>
+        </div>
+        <button className="btn btn-ghost" onClick={onClose}><Icon name="x" size={13}/> Close</button>
+      </div>
+      <pre className="debug-markdown">{doc.markdown}</pre>
+    </div>
+  );
+}
+
+function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail, debugDoc, setDebugDoc }: {
   stream: StreamMessage[];
   onRegenerate: (msg: StreamMessage) => void;
   onRefine: (msg: StreamMessage, state: RefineState) => void;
   onOpenDetail: (msg: StreamMessage, imgIdx: number) => void;
+  debugDoc: DebugDocState | null;
+  setDebugDoc: (doc: DebugDocState | null) => void;
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
   // Track which block is in "refine mode" — keyed by stream index
@@ -615,6 +714,8 @@ function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail }: {
   }, [stream]);
 
   const asstMsgs = stream.map((m, i) => ({ m, i })).filter(({ m }) => m.role === 'asst');
+
+  if (debugDoc) return <DebugMarkdownCanvas doc={debugDoc} onClose={() => setDebugDoc(null)}/>;
 
   return (
     <div ref={canvasRef} className="gen-canvas">
@@ -673,7 +774,7 @@ function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail }: {
 
 function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPrompt, onSend,
   activePreset, setPreset, openCreateBrand, stream, onRegenerate, onRefine,
-  onOpenDetail, attached, setAttached, onReset }: {
+  onOpenDetail, attached, setAttached, onReset, debugDoc, setDebugDoc }: {
   brand: Brand | null; brands: Brand[]; activeBrand: string | null;
   setActiveBrand: (id: string | null) => void;
   prompt: string; setPrompt: (v: string) => void; onSend: () => void;
@@ -685,6 +786,8 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
   onOpenDetail: (msg: StreamMessage, imgIdx: number) => void;
   attached: AttachedImage[]; setAttached: React.Dispatch<React.SetStateAction<AttachedImage[]>>;
   onReset: () => void;
+  debugDoc: DebugDocState | null;
+  setDebugDoc: (doc: DebugDocState | null) => void;
 }) {
   const active = stream.length > 0;
 
@@ -709,7 +812,12 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
               <div className="trace-intro-copy">Each run shows the actual priority stack used before image generation.</div>
             </div>
             {stream.filter(m => m.role === 'asst' && m.trace).map((m, i) => (
-              <GenerationTraceCard key={i} trace={m.trace!} error={m.error}/>
+              <GenerationTraceCard
+                key={i}
+                trace={m.trace!}
+                error={m.error}
+                onDebug={trace => trace.debugMarkdown && setDebugDoc({ title: 'generation-debug.md', markdown: trace.debugMarkdown })}
+              />
             ))}
           </div>
           <div className="composer-foot">
@@ -722,7 +830,7 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
 
         {/* Right: results */}
         <ExploreResults stream={stream} onRegenerate={onRegenerate} onRefine={onRefine}
-          onOpenDetail={onOpenDetail}/>
+          onOpenDetail={onOpenDetail} debugDoc={debugDoc} setDebugDoc={setDebugDoc}/>
       </div>
     );
   }
@@ -1168,6 +1276,7 @@ export default function App() {
   const [prompt, setPrompt] = useState('');
   const [activePreset, setActivePreset] = useState<string|null>(null);
   const [detail, setDetail] = useState<DetailState|null>(null);
+  const [debugDoc, setDebugDoc] = useState<DebugDocState | null>(null);
   const [attached, setAttached] = useState<AttachedImage[]>([]);
   const [savedImages, setSavedImages] = useState<SavedImage[]>([]);
 
@@ -1197,13 +1306,38 @@ export default function App() {
       });
 
       const json = await res.json();
-      if (!res.ok || json.error) throw new Error(json.error ?? 'Generation failed');
+      if (!res.ok || json.error) {
+        const message = json.error ?? 'Generation failed';
+        const debugMarkdown = formatDebugMarkdown(userPrompt, currentBrand, attachedRefs, json.debug, message);
+        setStream(prev => {
+          const next = [...prev];
+          const prevTrace = next[msgIdx]?.trace;
+          next[msgIdx] = {
+            role: 'asst',
+            images: [],
+            prompt: userPrompt,
+            referenceImages: attachedRefs,
+            variant: next[msgIdx]?.variant,
+            error: message,
+            trace: {
+              ...(prevTrace ?? createGenerationTrace(userPrompt, currentBrand, attachedRefs, 'generate', 'error')),
+              status: 'error',
+              modelName: json.debug?.selectedModels?.[0] ?? prevTrace?.modelName ?? 'Gemini Flash Image',
+              debugMarkdown,
+            },
+          };
+          return next;
+        });
+        return;
+      }
 
       const images: string[] = (json.images ?? []).map((img: { data: string; mimeType: string }) =>
         `data:${img.mimeType};base64,${img.data}`
       );
 
       const cappedImages = images.slice(0, 2);
+      const debugMarkdown = formatDebugMarkdown(userPrompt, currentBrand, attachedRefs, json.debug);
+      const modelName = json.debug?.selectedModels?.[0] ?? 'Gemini Flash Image';
       setSavedImages(prev => [
         ...cappedImages.map((src, j) => ({
           id: `${Date.now()}-${j}`,
@@ -1222,12 +1356,15 @@ export default function App() {
           prompt: userPrompt,
           referenceImages: attachedRefs,
           variant: next[msgIdx]?.variant,
-          trace: prevTrace ? { ...prevTrace, status: 'complete' } : createGenerationTrace(userPrompt, currentBrand, attachedRefs, 'generate', 'complete'),
+          trace: prevTrace
+            ? { ...prevTrace, status: 'complete', modelName, debugMarkdown }
+            : { ...createGenerationTrace(userPrompt, currentBrand, attachedRefs, 'generate', 'complete'), modelName, debugMarkdown },
         };
         return next;
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
+      const debugMarkdown = formatDebugMarkdown(userPrompt, currentBrand, attachedRefs, undefined, message);
       setStream(prev => {
         const next = [...prev];
         const prevTrace = next[msgIdx]?.trace;
@@ -1238,7 +1375,9 @@ export default function App() {
           referenceImages: attachedRefs,
           variant: next[msgIdx]?.variant,
           error: message,
-          trace: prevTrace ? { ...prevTrace, status: 'error' } : createGenerationTrace(userPrompt, currentBrand, attachedRefs, 'generate', 'error'),
+          trace: prevTrace
+            ? { ...prevTrace, status: 'error', debugMarkdown }
+            : { ...createGenerationTrace(userPrompt, currentBrand, attachedRefs, 'generate', 'error'), debugMarkdown },
         };
         return next;
       });
@@ -1325,7 +1464,9 @@ export default function App() {
             onRefine={handleRefine}
             onOpenDetail={(msg, imgIdx) => setDetail({ images: msg.images??[], idx: imgIdx, prompt: msg.prompt??'', brand: brand??undefined })}
             attached={attached} setAttached={setAttached}
-            onReset={() => setStream([])}
+            onReset={() => { setStream([]); setDebugDoc(null); }}
+            debugDoc={debugDoc}
+            setDebugDoc={setDebugDoc}
           />
         )}
 
