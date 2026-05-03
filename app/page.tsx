@@ -123,12 +123,26 @@ const GALLERY_GRADS = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function readFileAsDataURL(file: File): Promise<string> {
+// Resize + re-encode to JPEG before storing — keeps base64 payloads small
+// enough to fit within Vercel's 4.5 MB serverless body limit.
+// maxPx: longest edge in pixels. quality: JPEG 0–1.
+function resizeImage(file: File, maxPx = 512, quality = 0.75): Promise<string> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => resolve(e.target?.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+    img.src = objectUrl;
   });
 }
 
@@ -218,9 +232,8 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
   const handleAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const dataURL = await readFileAsDataURL(file);
-    const { mimeType } = dataURLtoBase64(dataURL);
-    setAttached({ dataURL, mimeType, name: file.name });
+    const dataURL = await resizeImage(file, 512, 0.75);
+    setAttached({ dataURL, mimeType: 'image/jpeg', name: file.name });
     e.target.value = '';
   };
 
@@ -599,16 +612,17 @@ function BrandEditor({ brand: init, onBack, onSave }: {
 
   const handleLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
-    const d = await readFileAsDataURL(f);
+    // Logo: slightly larger so the model can read wordmarks clearly
+    const d = await resizeImage(f, 800, 0.85);
     setLogoImage(d);
     if (!logoText) setLogoText(f.name.replace(/\.[^.]+$/,''));
   };
   const handleRefs = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     for (const f of files.slice(0, 5 - refImages.length)) {
-      const d = await readFileAsDataURL(f);
-      const { mimeType } = dataURLtoBase64(d);
-      setRefImages(p=>[...p,{id:Math.random().toString(36).slice(2),data:d,mimeType}]);
+      // Reference images: 512px is plenty for style extraction
+      const d = await resizeImage(f, 512, 0.75);
+      setRefImages(p=>[...p,{id:Math.random().toString(36).slice(2),data:d,mimeType:'image/jpeg'}]);
     }
     e.target.value = '';
   };
