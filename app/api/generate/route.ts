@@ -37,10 +37,43 @@ interface GenerateRequest {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// STEP 1 — Brand context block
+// STEP 1 — Global quality standards
 //
-// Injected as the opening system instruction before any images or prompt.
-// hasLogo / refCount are passed so the rules can reference what's attached.
+// Appended to every generation regardless of brand or preset.
+// These directives push the model toward commercial-grade output.
+// Tune the wording here to raise or lower the technical bar.
+// ─────────────────────────────────────────────────────────────────────────────
+const QUALITY_STANDARDS = `\
+━━━ TECHNICAL QUALITY REQUIREMENTS (mandatory for every output) ━━━
+
+RESOLUTION & SHARPNESS:
+  • Maximum detail fidelity — render at the highest possible quality
+  • Tack-sharp focus on the hero subject with optically natural depth of field
+  • No soft edges from AI blur, no unintended motion blur, no halation
+
+PHOTOREALISM:
+  • Physically accurate materials: glass refracts light correctly, metal reflects
+    environment, fabric has micro-texture and weave detail, liquid has meniscus
+  • No AI tells: no melting geometry, no hallucinated reflections, no extra limbs
+  • Accurate product geometry: labels lie flat on curves, logos have correct perspective
+  • Physically plausible lighting — shadows and highlights obey a single light source
+
+EXPOSURE & COLOR SCIENCE:
+  • Full dynamic range: rich shadow detail without crush, highlights without blow-out
+  • Accurate white balance and color grading consistent throughout the frame
+  • No over-saturation, no unnatural glow, no HDR halo artifacts
+
+OUTPUT STANDARD:
+  • Commercial photography quality — suitable for print, large-format digital, campaigns
+  • Clean, noise-free result (add intentional film grain only if brand aesthetic demands it)
+  • No visual glitches, warping, stitching artifacts, or repeated patterns
+  • Composition follows rule of thirds or golden ratio; intentional, not accidental`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STEP 2 — Brand context block
+//
+// Injected before preset + quality when a brand is active.
+// hasLogo / refCount are passed so rules can reference what's actually attached.
 //
 // Priority hierarchy (enforced in text):
 //   1. Brand logo  → render faithfully when logo appears in scene
@@ -65,17 +98,17 @@ function buildBrandContext(brand: BrandDNA, hasLogo: boolean, refCount: number):
   lines.push(`  Brand name : ${brand.name}`);
   if (brand.voice) lines.push(`  Voice & feel: ${brand.voice}`);
   if (brand.palette.length) {
-    lines.push(`  Color palette (authoritative hex values):`);
+    lines.push('  Color palette (authoritative hex values):');
     brand.palette.forEach((c, i) => lines.push(`    ${i + 1}. ${c}`));
   }
   lines.push('');
 
-  // ── Asset inventory (tells the model what's attached) ─────────
+  // ── Asset inventory ──────────────────────────────────────────
   lines.push('━━━ ATTACHED BRAND ASSETS ━━━');
   if (hasLogo) {
-    lines.push('  [LOGO IMAGE ATTACHED] — see the image immediately following this text block.');
+    lines.push('  [LOGO IMAGE ATTACHED] — see the image immediately following this text.');
     lines.push('  This is the official brand logo. Memorize its exact shape, colors,');
-    lines.push('  proportions, and design details. You will need to reproduce it accurately.');
+    lines.push('  proportions, and design details — you will reproduce it accurately.');
   } else {
     lines.push('  [No logo attached] — do not invent a logo.');
   }
@@ -83,114 +116,125 @@ function buildBrandContext(brand: BrandDNA, hasLogo: boolean, refCount: number):
     lines.push(`  [${refCount} REFERENCE IMAGE(S) ATTACHED] — see images following the logo.`);
     lines.push('  These images define the brand\'s visual language. Study them carefully.');
   } else {
-    lines.push('  [No reference images] — derive visual style from palette and voice.');
+    lines.push('  [No reference images] — derive visual style from palette and voice only.');
   }
   lines.push('');
 
-  // ── Mandatory rendering rules ─────────────────────────────────
-  lines.push('━━━ MANDATORY RULES — follow ALL of these without exception ━━━');
+  // ── Mandatory brand rules ─────────────────────────────────────
+  lines.push('━━━ BRAND RULES — follow ALL without exception ━━━');
   lines.push('');
 
   if (hasLogo) {
     lines.push('LOGO RENDERING:');
-    lines.push('  • The attached logo image is the ground truth. Reproduce it faithfully.');
+    lines.push('  • The attached logo image is the ground truth — reproduce it faithfully.');
     lines.push('  • When the scene includes a branded product, package, or surface,');
     lines.push('    render the logo on it with accurate colors, proportions, and details.');
     lines.push('  • Do NOT simplify, distort, or reimagine the logo — match it exactly.');
     lines.push('  • The logo\'s own colors take precedence over the palette in the logo area.');
-    lines.push('  • Logo placement should feel natural and professionally applied.');
+    lines.push('  • Logo placement should feel professionally applied — correct perspective,');
+    lines.push('    proper material interaction (e.g. slight surface curvature on bottles).');
     lines.push('');
   }
 
   if (refCount > 0) {
     lines.push('REFERENCE IMAGES (HIGHEST PRIORITY for visual style):');
-    lines.push('  • These images ARE the brand\'s visual identity. They override everything');
+    lines.push('  • These images ARE the brand\'s visual identity — they override everything');
     lines.push('    else when it comes to aesthetic decisions.');
     lines.push('  • Replicate exactly: lighting quality, color grading, texture, grain,');
     lines.push('    depth of field, shadow softness, highlight roll-off, and mood.');
     lines.push('  • Match the compositional approach: negative space, subject framing,');
     lines.push('    camera angle, and focal length feel.');
-    lines.push('  • If references use a specific photographic style (e.g. film, studio,');
-    lines.push('    editorial, lifestyle), reproduce that style precisely.');
+    lines.push('  • If references use a specific style (film, studio, editorial, lifestyle),');
+    lines.push('    reproduce that style precisely in the output.');
     lines.push('');
   }
 
   if (brand.palette.length) {
-    lines.push('COLOR PALETTE (authoritative — second priority after reference images):');
+    lines.push('COLOR PALETTE (second priority after reference images):');
     lines.push(`  • Dominant palette: ${brand.palette.join(', ')}`);
-    lines.push('  • These hex values are the law. Apply them to backgrounds, surfaces,');
-    lines.push('    props, clothing, and environmental elements.');
-    lines.push('  • Do not introduce colors outside this palette unless physically');
-    lines.push('    unavoidable (e.g., human skin tones, natural elements).');
+    lines.push('  • Apply these hex values to backgrounds, surfaces, props, and environment.');
+    lines.push('  • Do not introduce colors outside this palette unless physically unavoidable.');
     lines.push('  • Color temperature and saturation must align with these swatches.');
     lines.push('');
   }
 
   if (brand.voice) {
-    lines.push('BRAND VOICE & EMOTIONAL ATMOSPHERE:');
+    lines.push('BRAND VOICE & ATMOSPHERE:');
     lines.push(`  • The brand feels: "${brand.voice}"`);
-    lines.push('  • Let this permeate every visual choice — lighting mood, subject');
-    lines.push('    expression, environmental texture, and pacing of the composition.');
+    lines.push('  • Let this permeate lighting mood, subject expression, texture, composition.');
     lines.push('  • A viewer should feel this brand\'s personality without reading any text.');
     lines.push('');
   }
 
-  lines.push('GENERAL CONSTRAINTS:');
+  lines.push('GENERAL:');
   lines.push('  • Do NOT add random text, watermarks, or unsolicited brand names.');
   lines.push('  • DO render the brand logo when it is part of the requested scene.');
   lines.push('  • Brand consistency overrides literal prompt interpretation.');
-  lines.push('  • Quality bar: this image should be publishable in a brand campaign.');
 
   return lines.join('\n');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// STEP 2 — Style preset modifier
+// STEP 3 — Style preset modifier
 //
 // Each preset adds photographic/design direction ON TOP of brand rules.
-// Add or edit entries here to tune generation for specific use cases.
+// Includes technical camera specs to steer the model toward professional output.
 // These co-exist with brand DNA — they shape composition, not override brand.
 // ─────────────────────────────────────────────────────────────────────────────
 const PRESET_MODIFIERS: Record<string, string> = {
   editorial:
-    'PHOTOGRAPHY STYLE (apply within brand constraints): Editorial — ' +
-    'dramatic directional lighting with deep intentional shadows; high contrast ratio; ' +
-    'magazine-quality composition with strong visual tension; mood and emotion first.',
+    'PHOTOGRAPHY STYLE — Editorial (apply within brand constraints):\n' +
+    '  Dramatic single-source directional lighting with deep, intentional shadows.\n' +
+    '  High contrast ratio (5:1 or greater). Magazine-quality composition.\n' +
+    '  Equivalent to 85mm f/2.0, ISO 100, precise metering on subject.\n' +
+    '  Mood and emotion are the primary subject — technical perfection serves feeling.',
 
   product:
-    'PHOTOGRAPHY STYLE (apply within brand constraints): Product — ' +
-    'clean studio environment with neutral or brand-palette background; ' +
-    'sharp edge-to-edge focus; professional three-point lighting; ' +
-    'product perfectly centered with no distractions.',
+    'PHOTOGRAPHY STYLE — Product (apply within brand constraints):\n' +
+    '  Professional studio: seamless neutral or brand-palette background.\n' +
+    '  Three-point lighting with softbox key, fill, and rim separation.\n' +
+    '  Equivalent to 100mm macro f/8, ISO 100 — maximum depth of field, zero noise.\n' +
+    '  Product perfectly centered. Every detail of materials and surface must be crisp.\n' +
+    '  No environmental distractions. The product IS the image.',
 
   lifestyle:
-    'PHOTOGRAPHY STYLE (apply within brand constraints): Lifestyle — ' +
-    'candid authentic moments; warm soft natural light; genuine human presence; ' +
-    'shallow depth of field that draws focus to the hero element.',
+    'PHOTOGRAPHY STYLE — Lifestyle (apply within brand constraints):\n' +
+    '  Candid authentic moment, warm soft natural or golden-hour light.\n' +
+    '  Genuine human presence; emotions feel unposed and real.\n' +
+    '  Equivalent to 35mm f/2.0 — slight environmental context visible.\n' +
+    '  Shallow depth of field draws focus to the hero element naturally.',
 
   social:
-    'PHOTOGRAPHY STYLE (apply within brand constraints): Social media — ' +
-    'vibrant high-energy composition; optimized for square crop; ' +
-    'bold visual hierarchy readable at thumbnail size; eye-catching contrast.',
+    'PHOTOGRAPHY STYLE — Social Media (apply within brand constraints):\n' +
+    '  Vibrant, high-energy. Optimized for square 1:1 or vertical 4:5 crop.\n' +
+    '  Bold visual hierarchy — readable instantly at thumbnail (150px) size.\n' +
+    '  Eye-catching contrast and saturation within the brand palette.\n' +
+    '  Single clear hero element — no visual clutter.',
 
   banner:
-    'PHOTOGRAPHY STYLE (apply within brand constraints): Web banner — ' +
-    'wide cinematic 16:9 or 3:1 composition; strong intentional negative space ' +
-    'on one side for headline overlay; minimal, impactful, single visual story.',
+    'PHOTOGRAPHY STYLE — Web Banner (apply within brand constraints):\n' +
+    '  Wide cinematic composition — 16:9 or 3:1 aspect feel.\n' +
+    '  Strong intentional negative space on LEFT or RIGHT third for copy overlay.\n' +
+    '  Equivalent to 24mm wide, low angle or level — grand, impactful scale.\n' +
+    '  Single unambiguous visual story. Minimal elements, maximum impact.',
 
   package:
-    'PHOTOGRAPHY STYLE (apply within brand constraints): Packaging — ' +
-    '3D product render or styled flat-lay; soft studio lighting with subtle ' +
-    'surface reflection; product center-stage; tactile material quality visible.',
+    'PHOTOGRAPHY STYLE — Packaging (apply within brand constraints):\n' +
+    '  Hero product in 3/4 view or straight-on. Soft studio lighting.\n' +
+    '  Subtle surface reflection below product — polished marble or acrylic.\n' +
+    '  Equivalent to 90mm f/11 — sharp from front to back of package.\n' +
+    '  Tactile material quality clearly visible: matte, gloss, texture, emboss.\n' +
+    '  Logo and type on packaging rendered with perfect legibility.',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// STEP 3 — Full prompt assembly
+// STEP 4 — Full prompt assembly
 //
-// Final text sent to the model (before images). Structure:
-//   [Brand DNA block]   — who the brand is + mandatory rules
-//   [Preset modifier]   — photographic style direction
-//   [Generation task]   — the user's actual request
+// Final text block sent to the model. Structure:
+//   [Brand DNA]        — who the brand is + mandatory rules
+//   [Preset modifier]  — photographic style direction
+//   [Quality standards]— technical quality requirements
+//   [Generation task]  — the user's actual request
 // ─────────────────────────────────────────────────────────────────────────────
 function buildFullPrompt(
   userPrompt: string,
@@ -209,25 +253,27 @@ function buildFullPrompt(
     sections.push(PRESET_MODIFIERS[preset]);
   }
 
+  sections.push(QUALITY_STANDARDS);
+
   sections.push(
     '━━━ GENERATION TASK ━━━\n' +
-    'Now apply ALL brand rules above and generate the following:\n\n' +
-    userPrompt.trim() + '\n\n' +
-    'Remember: brand DNA + style rules are non-negotiable. Execute the task within them.'
+    'Apply ALL brand rules, style direction, and quality requirements above.\n\n' +
+    'Generate: ' + userPrompt.trim() + '\n\n' +
+    'This output must be publication-ready. No compromises on quality or brand fidelity.'
   );
 
   return sections.join('\n\n');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// STEP 4 — API parts array
+// STEP 5 — API parts array
 //
-// Critical: interleave labeled text before each image so the model understands
-// the ROLE of each image before processing it. Order:
-//   1. Full text prompt (brand context + task)
-//   2. [text label] "BRAND LOGO:" + logo inlineData
-//   3. [text label] "REFERENCE IMAGE N of M:" + ref inlineData (up to 4)
-//   4. [final reinforcement text] — re-states the core task at the end
+// Interleave labeled text before each image so the model understands the ROLE
+// of each image before processing it. Order:
+//   1. Full text prompt (brand context + preset + quality + task)
+//   2. [label] "BRAND LOGO" + logo inlineData
+//   3. [label] "REFERENCE IMAGE N of M" + ref inlineData (up to 4)
+//   4. [task reinforcement] — re-states scene + quality bar after all images
 //
 // The label-before-image pattern is the key to reliable multi-image grounding.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -240,52 +286,63 @@ function buildApiParts(
 ): object[] {
   const parts: object[] = [{ text: promptText }];
 
-  // Logo with a clear role label immediately before the image
+  // Logo: labeled immediately before the image for clear role anchoring
   if (logoImage) {
     parts.push({
       text:
-        `[BRAND LOGO — study and memorize]\n` +
+        `[BRAND LOGO — study and memorize precisely]\n` +
         `This is the official logo for "${brand?.name ?? 'this brand'}". ` +
-        `It is the #1 brand asset. When the scene calls for the logo on a product ` +
-        `or surface, render it exactly as shown: same shape, same colors, same proportions.`,
+        `It is the #1 brand asset. Reproduce it exactly: same icon shape, same colors, ` +
+        `same proportions, same weight. When the scene calls for the logo on a product ` +
+        `or surface, render it faithfully with correct material interaction.`,
     });
     parts.push({ inlineData: { mimeType: logoImage.mimeType, data: logoImage.data } });
   }
 
-  // Reference images with numbered labels so the model processes each distinctly
+  // Reference images: numbered labels so the model processes each distinctly
   const refs = referenceImages.slice(0, 4);
   refs.forEach((img, i) => {
     parts.push({
       text:
         `[REFERENCE IMAGE ${i + 1} of ${refs.length} — visual style guide]\n` +
-        `Study the lighting, color grading, texture, composition, and atmosphere ` +
-        `of this image. This is how "${brand?.name ?? 'this brand'}" looks and feels. ` +
-        `Replicate this visual language in the output.`,
+        `Study and internalize: lighting direction, color grading, texture quality, ` +
+        `depth of field, shadow character, highlight roll-off, and overall atmosphere. ` +
+        `This is how "${brand?.name ?? 'this brand'}" looks and feels. ` +
+        `Your output must match this visual language precisely.`,
     });
     parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
   });
 
-  // Final reinforcement: re-state the task after all images so it stays fresh
-  parts.push({
-    text:
-      `[TASK REMINDER]\n` +
-      `You have now seen all brand assets above. ` +
-      `Generate this scene while honoring every brand rule:\n\n` +
-      `"${userPrompt.trim()}"\n\n` +
-      (logoImage
-        ? `If the scene includes a branded product, render the logo from the attached logo image faithfully on it. `
-        : '') +
-      (refs.length > 0
-        ? `Match the visual style of the reference images — lighting, palette, mood, and composition. `
-        : '') +
-      `Brand consistency is mandatory. Deliver a publication-quality result.`,
-  });
+  // Final reinforcement: re-state task + quality expectation after all images
+  const reinforcement: string[] = [
+    '[FINAL TASK — generate now]',
+    `You have studied all brand assets. Now produce a publication-quality image of:\n`,
+    `"${userPrompt.trim()}"`,
+    '',
+  ];
+  if (logoImage) {
+    reinforcement.push(
+      `LOGO: Render the brand logo from the attached image faithfully on the product/surface. ` +
+      `Correct perspective, material curvature, and lighting interaction.`
+    );
+  }
+  if (refs.length > 0) {
+    reinforcement.push(
+      `STYLE: Match the lighting, palette, and mood from the ${refs.length} reference image(s) exactly.`
+    );
+  }
+  reinforcement.push(
+    `QUALITY: Photorealistic, tack-sharp, full dynamic range, no AI artifacts. ` +
+    `Commercial photography standard. This must be campaign-ready.`
+  );
+
+  parts.push({ text: reinforcement.join('\n') });
 
   return parts;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// STEP 5 — Single generation call
+// STEP 6 — Single generation call
 // Tries each model in IMAGE_GENERATION_MODELS until one returns an image.
 // ─────────────────────────────────────────────────────────────────────────────
 async function generateOne(
