@@ -35,8 +35,9 @@ interface StreamMessage {
   loading?: boolean;
   images?: string[];
   prompt?: string;
-  attachedImage?: string; // data URL thumbnail shown in chat
+  attachedImage?: string;
   error?: string;
+  variant?: 'regen' | 'refine';
 }
 
 interface DetailState {
@@ -51,6 +52,13 @@ interface RefineState {
   q2: string[];   // what to change
   q3: string[];   // priority element
   q4: string;     // free text
+}
+
+interface SavedImage {
+  id: string;
+  src: string;
+  prompt: string;
+  brandName?: string;
 }
 
 // ── SVG Icon ──────────────────────────────────────────────────────────────────
@@ -108,14 +116,22 @@ const DEFAULT_BRANDS: Brand[] = [
   { id: 'plume', name: 'Plume Studio', logoText: 'Plume', palette: ['#FFE5EC','#FF7AA2','#5B1339','#FFFFFF'], voice: 'Playful, bold, expressive.', edited: '3d ago', keywords: ['soft pinks','high contrast','paper textures'], samples: ['grad-2','grad-5','grad-8'], referenceImages: [] },
 ];
 
-const PRESETS = [
-  { id: 'general',   name: 'General' },
-  { id: 'editorial', name: 'Editorial' },
-  { id: 'product',   name: 'Product' },
-  { id: 'lifestyle', name: 'Lifestyle' },
-  { id: 'social',    name: 'Social post' },
-  { id: 'banner',    name: 'Web banner' },
-  { id: 'package',   name: 'Packaging' },
+const PROMPT_SUGGESTIONS = [
+  {
+    label: 'Product shot',
+    sub: 'Studio · clean background',
+    prompt: 'Professional studio product shot on a clean minimal surface, brand logo clearly visible, sharp focus, neutral background',
+  },
+  {
+    label: 'Lifestyle moment',
+    sub: 'Candid · natural light',
+    prompt: 'Authentic lifestyle photo of someone using the product in a natural on-brand moment, warm natural light, shallow depth of field',
+  },
+  {
+    label: 'Campaign hero',
+    sub: 'Editorial · full bleed',
+    prompt: 'Bold campaign hero image, dramatic lighting, minimal composition with strong negative space, publication-ready quality',
+  },
 ];
 
 // Placeholder gallery — 16 gradient tiles in a 4-col grid
@@ -313,7 +329,7 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
             <Icon name="chevD" size={10}/>
           </button>
           {popOpen && (
-            <div className="brand-pop" style={{top:'calc(100% + 6px)',left:0}}>
+            <div className="brand-pop" style={{bottom:'calc(100% + 6px)',left:0}}>
               <div className="brand-pop-h">Apply Brand DNA</div>
               {/* No brand option */}
               <div className={`brand-pop-row ${!brand?'active':''}`} onClick={()=>{setActiveBrand(null);setPopOpen(false);}}>
@@ -339,7 +355,7 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
 
         {!compact && (
           <button className={`tool-pill ${activePreset?'active':''}`} onClick={()=>setPreset(activePreset?null:'editorial')}>
-            <Icon name="layers" size={11}/>{activePreset?PRESETS.find(p=>p.id===activePreset)?.name??'Style':'Style'}
+            <Icon name="layers" size={11}/> Style
           </button>
         )}
         <button className="tool-pill"><Icon name="ratio" size={11}/> 1:1</button>
@@ -378,9 +394,9 @@ function ExploreGallery() {
 
 // ── Refine questionnaire ──────────────────────────────────────────────────────
 
-const REFINE_Q1 = ['Colors off brand','Lighting / mood','Logo not accurate','Composition','Style mismatch','Quality issues'];
-const REFINE_Q2 = ['More contrast','Darker','Brighter','Warmer tones','Cooler tones','Different angle','Tighter framing','More minimal','More dramatic'];
-const REFINE_Q3 = ['Background','Main subject','Logo / branding','Color grading','Atmosphere & mood','Textures & materials'];
+const REFINE_Q1 = ['Colors off','Lighting / mood','Logo wrong','Composition','Style','Quality'];
+const REFINE_Q2 = ['More contrast','Darker','Brighter','Warmer','Cooler','Different angle','More minimal','More dramatic'];
+const REFINE_Q3 = ['Background','Subject','Logo','Color grade','Atmosphere','Textures'];
 
 function RefineForm({ onSubmit, onCancel }: {
   onSubmit: (state: RefineState) => void;
@@ -395,12 +411,12 @@ function RefineForm({ onSubmit, onCancel }: {
     set(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
 
   const chips = (opts: string[], sel: string[], set: (v: string[]) => void) => (
-    <div style={{display:'flex',flexWrap:'wrap',gap:5,marginTop:6}}>
+    <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:7}}>
       {opts.map(o => (
         <button key={o} onClick={() => toggle(sel, o, set)}
-          style={{padding:'3px 10px',borderRadius:100,fontSize:11,border:'1px solid',cursor:'pointer',transition:'all 0.12s',
+          style={{padding:'6px 14px',borderRadius:100,fontSize:12,border:'1px solid',cursor:'pointer',transition:'all 0.12s',fontWeight:500,
             borderColor: sel.includes(o) ? 'var(--accent)' : 'var(--line)',
-            background: sel.includes(o) ? 'var(--accent-soft)' : 'transparent',
+            background: sel.includes(o) ? 'var(--accent-soft)' : 'var(--bg-2)',
             color: sel.includes(o) ? 'var(--accent-text)' : 'var(--text-2)'}}>
           {o}
         </button>
@@ -408,38 +424,35 @@ function RefineForm({ onSubmit, onCancel }: {
     </div>
   );
 
+  const row = (label: string, content: React.ReactNode, delay: number) => (
+    <div style={{animation:`fadeSlideUp 0.22s ease ${delay}s both`}}>
+      <div style={{fontSize:11,color:'var(--text-3)',fontWeight:600,letterSpacing:'0.04em',textTransform:'uppercase'}}>{label}</div>
+      {content}
+    </div>
+  );
+
   return (
     <div style={{marginTop:10,padding:'14px 16px',background:'var(--bg-1)',border:'1px solid var(--line)',borderRadius:12,display:'flex',flexDirection:'column',gap:12}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <span style={{fontSize:12,fontWeight:600,color:'var(--text-1)'}}>Refine this generation</span>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',animation:'fadeSlideUp 0.18s ease both'}}>
+        <span style={{fontSize:12,fontWeight:600,color:'var(--text-1)'}}>What to fix?</span>
         <button onClick={onCancel} style={{color:'var(--text-3)',display:'flex'}}><Icon name="x" size={12}/></button>
       </div>
-
-      <div>
-        <div style={{fontSize:11,color:'var(--text-3)',fontWeight:500}}>What's the main issue?</div>
-        {chips(REFINE_Q1, q1, setQ1)}
-      </div>
-      <div>
-        <div style={{fontSize:11,color:'var(--text-3)',fontWeight:500}}>What should change?</div>
-        {chips(REFINE_Q2, q2, setQ2)}
-      </div>
-      <div>
-        <div style={{fontSize:11,color:'var(--text-3)',fontWeight:500}}>Which element needs the most work?</div>
-        {chips(REFINE_Q3, q3, setQ3)}
-      </div>
-      <div>
-        <div style={{fontSize:11,color:'var(--text-3)',fontWeight:500,marginBottom:5}}>Any other direction? <span style={{fontWeight:400}}>(optional)</span></div>
+      {row('Issue', chips(REFINE_Q1, q1, setQ1), 0.04)}
+      {row('Change', chips(REFINE_Q2, q2, setQ2), 0.08)}
+      {row('Focus on', chips(REFINE_Q3, q3, setQ3), 0.12)}
+      <div style={{animation:`fadeSlideUp 0.22s ease 0.16s both`}}>
+        <div style={{fontSize:11,color:'var(--text-3)',fontWeight:600,letterSpacing:'0.04em',textTransform:'uppercase',marginBottom:7}}>Notes <span style={{fontWeight:400,textTransform:'none',letterSpacing:'normal'}}>(optional)</span></div>
         <textarea value={q4} onChange={e=>setQ4(e.target.value)}
-          placeholder="e.g. warmer tones, tighter crop, logo should be more prominent…"
-          style={{width:'100%',background:'var(--bg-2)',border:'1px solid var(--line)',borderRadius:8,padding:'7px 10px',fontSize:11,color:'var(--text-1)',resize:'none',lineHeight:1.5,boxSizing:'border-box'}}
+          placeholder="e.g. warmer tones, logo larger, darker background…"
+          style={{width:'100%',background:'var(--bg-2)',border:'1px solid var(--line)',borderRadius:8,padding:'8px 10px',fontSize:12,color:'var(--text-1)',resize:'none',lineHeight:1.5,boxSizing:'border-box'}}
           rows={2}/>
       </div>
-      <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
-        <button className="btn btn-ghost" style={{fontSize:11,padding:'5px 12px'}} onClick={onCancel}>Cancel</button>
-        <button className="btn btn-primary" style={{fontSize:11,padding:'5px 14px'}}
+      <div style={{display:'flex',gap:6,justifyContent:'flex-end',animation:`fadeSlideUp 0.22s ease 0.2s both`}}>
+        <button className="btn btn-ghost" style={{fontSize:12,padding:'7px 14px'}} onClick={onCancel}>Cancel</button>
+        <button className="btn btn-primary" style={{fontSize:12,padding:'7px 16px'}}
           onClick={() => onSubmit({ q1, q2, q3, q4 })}
           disabled={!q1.length && !q2.length && !q3.length && !q4.trim()}>
-          Generate refined version →
+          Generate refined →
         </button>
       </div>
     </div>
@@ -450,10 +463,9 @@ function RefineForm({ onSubmit, onCancel }: {
 
 function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail }: {
   stream: StreamMessage[];
-  onRegenerate: (msg: StreamMessage, idx: number) => void;
-  onRefine: (msg: StreamMessage, idx: number, refineState: RefineState) => void;
+  onRegenerate: (msg: StreamMessage) => void;
+  onRefine: (msg: StreamMessage, state: RefineState) => void;
   onOpenDetail: (msg: StreamMessage, imgIdx: number) => void;
-  brand: Brand | null;
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
   // Track which block is in "refine mode" — keyed by stream index
@@ -504,11 +516,11 @@ function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail }: {
           {!m.loading && !m.error && (
             refining === i
               ? <RefineForm
-                  onSubmit={state => { setRefining(null); onRefine(m, i, state); }}
+                  onSubmit={state => { setRefining(null); onRefine(m, state); }}
                   onCancel={() => setRefining(null)}
                 />
               : <div style={{display:'flex',gap:6,marginTop:10}}>
-                  <button className="action-pill" onClick={()=>onRegenerate(m,i)}>Regenerate</button>
+                  <button className="action-pill" onClick={()=>onRegenerate(m)}>Regenerate</button>
                   <button className="action-pill" onClick={()=>setRefining(i)}>Refine</button>
                 </div>
           )}
@@ -522,17 +534,18 @@ function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail }: {
 
 function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPrompt, onSend,
   activePreset, setPreset, openCreateBrand, stream, onRegenerate, onRefine,
-  onOpenDetail, attached, setAttached }: {
+  onOpenDetail, attached, setAttached, onReset }: {
   brand: Brand | null; brands: Brand[]; activeBrand: string | null;
   setActiveBrand: (id: string | null) => void;
   prompt: string; setPrompt: (v: string) => void; onSend: () => void;
   activePreset: string | null; setPreset: (id: string | null) => void;
   openCreateBrand: () => void;
   stream: StreamMessage[];
-  onRegenerate: (msg: StreamMessage, idx: number) => void;
-  onRefine: (msg: StreamMessage, idx: number, state: RefineState) => void;
+  onRegenerate: (msg: StreamMessage) => void;
+  onRefine: (msg: StreamMessage, state: RefineState) => void;
   onOpenDetail: (msg: StreamMessage, imgIdx: number) => void;
   attached: AttachedImage | null; setAttached: (img: AttachedImage | null) => void;
+  onReset: () => void;
 }) {
   const active = stream.length > 0;
 
@@ -543,32 +556,36 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
         {/* Left: prompt history + composer */}
         <div className="gen-chat">
           <div className="chat-head">
+            <button onClick={onReset} style={{display:'flex',alignItems:'center',gap:5,color:'var(--text-3)',fontSize:12,padding:'3px 6px',borderRadius:6,transition:'color 0.12s'}}
+              onMouseEnter={e=>(e.currentTarget.style.color='var(--text-1)')} onMouseLeave={e=>(e.currentTarget.style.color='var(--text-3)')}>
+              <Icon name="chevL" size={13}/> New
+            </button>
             <Icon name="sparkle" size={14}/>
-            <div className="chat-head-title">New generation</div>
+            <div className="chat-head-title">Generation</div>
             <div style={{flex:1}}/>
           </div>
           <div className="chat-stream">
             {stream.map((m,i)=>(
               m.role==='user' ? (
-                <div key={i} className="msg-user">
+                <div key={i} className={`msg-user ${m.variant ? `msg-user-${m.variant}` : ''}`}>
                   {m.attachedImage && (
                     <img src={m.attachedImage} alt="" style={{display:'block',width:120,borderRadius:8,marginBottom:6,objectFit:'cover'}}/>
                   )}
                   {m.text}
                 </div>
               ) : (
-                <div key={i} className="msg-asst">
+                <div key={i} className={`msg-asst ${m.variant ? `msg-asst-${m.variant}` : ''}`}>
                   <div className="asst-head">
-                    <span className={`dot ${m.loading?'generating-dot':''}`}/>
-                    {m.loading
-                      ? `Generating${brand?` with ${brand.name} DNA`:''}…`
-                      : m.error ? 'Error' : 'Ideogram'}
+                    <span className={`dot ${m.loading ? 'generating-dot' : ''}`}/>
+                    <span style={{fontSize:12,color:'var(--text-3)'}}>
+                      {m.loading
+                        ? <>{brand ? <><span style={{color:'var(--accent-text)',fontWeight:500}}>{brand.name}</span> DNA</> : 'Ideogram'} · Generating…</>
+                        : m.error ? 'Error' : m.variant === 'regen' ? 'Regenerated' : m.variant === 'refine' ? 'Refined' : 'Ideogram'}
+                    </span>
                   </div>
                   {!m.loading && m.error && <div className="error-banner">{m.error}</div>}
                   {!m.loading && !m.error && (
-                    <div style={{fontSize:12,color:'var(--text-2)'}}>
-                      {m.text}
-                    </div>
+                    <div style={{fontSize:12,color:'var(--text-2)'}}>{m.text}</div>
                   )}
                 </div>
               )
@@ -584,7 +601,7 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
 
         {/* Right: results */}
         <ExploreResults stream={stream} onRegenerate={onRegenerate} onRefine={onRefine}
-          onOpenDetail={onOpenDetail} brand={brand}/>
+          onOpenDetail={onOpenDetail}/>
       </div>
     );
   }
@@ -597,11 +614,11 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
         brand={brand} setActiveBrand={setActiveBrand} brands={brands}
         activePreset={activePreset} setPreset={setPreset}
         openCreateBrand={openCreateBrand} attached={attached} setAttached={setAttached}/>
-      <div className="cat-strip">
-        {PRESETS.map(p=>(
-          <button key={p.id} className={`preset-pill ${activePreset===p.id?'active':''}`}
-            onClick={()=>setPreset(activePreset===p.id?null:p.id)}>
-            {p.name}
+      <div className="prompt-suggestions">
+        {PROMPT_SUGGESTIONS.map(s=>(
+          <button key={s.label} className="suggestion-card" onClick={()=>{ setPrompt(s.prompt); }}>
+            <div className="suggestion-label">{s.label}</div>
+            <div className="suggestion-sub">{s.sub}</div>
           </button>
         ))}
       </div>
@@ -965,6 +982,50 @@ function DetailModal({ detail, setDetail }: {
   );
 }
 
+// ── My Images page ────────────────────────────────────────────────────────────
+
+function ImagesPage({ images, onOpen }: { images: SavedImage[]; onOpen: (img: SavedImage) => void }) {
+  if (images.length === 0) {
+    return (
+      <div className="placeholder-page">
+        <div style={{maxWidth:520,textAlign:'center'}}>
+          <div style={{width:60,height:60,borderRadius:'50%',background:'var(--bg-1)',border:'1px solid var(--line)',display:'grid',placeItems:'center',margin:'0 auto 18px',color:'var(--text-3)'}}>
+            <Icon name="image2" size={22}/>
+          </div>
+          <h1 className="page-h1" style={{fontSize:28}}>My Images</h1>
+          <p className="page-sub" style={{margin:'12px auto 0',fontSize:13}}>
+            Images you generate will appear here. Start by creating something in <em>Explore</em>.
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <>
+      <div className="page-head">
+        <h1 className="page-h1">My <em>Images</em></h1>
+        <p className="page-sub">{images.length} image{images.length!==1?'s':''} generated this session.</p>
+      </div>
+      <div className="page-content">
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:10}}>
+          {images.map(img=>(
+            <div key={img.id} onClick={()=>onOpen(img)}
+              style={{borderRadius:12,overflow:'hidden',cursor:'pointer',background:'var(--bg-1)',border:'1px solid var(--line)',transition:'transform 0.15s'}}
+              onMouseEnter={e=>(e.currentTarget.style.transform='scale(1.02)')}
+              onMouseLeave={e=>(e.currentTarget.style.transform='scale(1)')}>
+              <img src={img.src} alt={img.prompt} style={{width:'100%',aspectRatio:'1/1',objectFit:'cover',display:'block'}}/>
+              <div style={{padding:'8px 10px'}}>
+                <div style={{fontSize:11,color:'var(--text-2)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{img.prompt}</div>
+                {img.brandName && <div style={{fontSize:10,color:'var(--accent-text)',marginTop:2}}>{img.brandName}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Placeholder ───────────────────────────────────────────────────────────────
 
 const PLACEHOLDER_LABEL: Record<string,string> = {
@@ -1007,6 +1068,7 @@ export default function App() {
   const [activePreset, setActivePreset] = useState<string|null>(null);
   const [detail, setDetail] = useState<DetailState|null>(null);
   const [attached, setAttached] = useState<AttachedImage|null>(null);
+  const [savedImages, setSavedImages] = useState<SavedImage[]>([]);
 
   const brand = brands.find(b => b.id === activeBrand) ?? null;
 
@@ -1049,12 +1111,22 @@ export default function App() {
         `data:${img.mimeType};base64,${img.data}`
       );
 
+      const cappedImages = images.slice(0, 2);
+      setSavedImages(prev => [
+        ...cappedImages.map((src, j) => ({
+          id: `${Date.now()}-${j}`,
+          src,
+          prompt: userPrompt,
+          brandName: currentBrand?.name,
+        })),
+        ...prev,
+      ].slice(0, 40));
       setStream(prev => {
         const next = [...prev];
         next[msgIdx] = {
           role: 'asst',
-          text: `Generated ${images.length} image${images.length!==1?'s':''}${currentBrand?` with ${currentBrand.name} DNA`:''}`,
-          images: images.slice(0, 2), // cap at 2
+          text: `Generated ${cappedImages.length} image${cappedImages.length!==1?'s':''}${currentBrand?` with ${currentBrand.name} DNA`:''}`,
+          images: cappedImages,
           prompt: userPrompt,
         };
         return next;
@@ -1086,19 +1158,20 @@ export default function App() {
     });
   }, [prompt, attached, generateImages]);
 
-  const handleRegenerate = useCallback((msg: StreamMessage, idx: number) => {
+  const handleRegenerate = useCallback((msg: StreamMessage) => {
     if (!msg.prompt) return;
     setStream(prev => {
-      const next = [...prev];
-      next[idx] = { role: 'asst', loading: true };
+      const userMsg: StreamMessage = { role: 'user', text: '↺ Regenerate', variant: 'regen' };
+      const loadingMsg: StreamMessage = { role: 'asst', loading: true, variant: 'regen' };
+      const next = [...prev, userMsg, loadingMsg];
+      const idx = next.length - 1;
       setTimeout(() => generateImages(msg.prompt!, idx, null), 0);
       return next;
     });
   }, [generateImages]);
 
-  const handleRefine = useCallback((msg: StreamMessage, idx: number, state: RefineState) => {
+  const handleRefine = useCallback((msg: StreamMessage, state: RefineState) => {
     if (!msg.prompt) return;
-    // Build a refined prompt from the original + structured feedback
     const issues = state.q1.length ? `Issues: ${state.q1.join(', ')}.` : '';
     const changes = state.q2.length ? `Changes needed: ${state.q2.join(', ')}.` : '';
     const focus = state.q3.length ? `Focus on: ${state.q3.join(', ')}.` : '';
@@ -1107,8 +1180,12 @@ export default function App() {
     const refinedPrompt = `${msg.prompt}\n\nREFINEMENT REQUEST: The previous generation had problems. ${feedback} Please generate a significantly improved version that fixes these specific issues while maintaining full brand DNA compliance.`;
 
     setStream(prev => {
-      const next = [...prev];
-      next[idx] = { role: 'asst', loading: true };
+      const parts = [state.q1, state.q2, state.q3].flat().filter(Boolean);
+      const label = parts.slice(0, 3).join(' · ') || 'Refinement';
+      const userMsg: StreamMessage = { role: 'user', text: `✦ Refine: ${label}`, variant: 'refine' };
+      const loadingMsg: StreamMessage = { role: 'asst', loading: true, variant: 'refine' };
+      const next = [...prev, userMsg, loadingMsg];
+      const idx = next.length - 1;
       setTimeout(() => generateImages(refinedPrompt, idx, null), 0);
       return next;
     });
@@ -1125,7 +1202,7 @@ export default function App() {
     setPage('brands');
   };
 
-  const PLACEHOLDER_PAGES = ['batch','models','styles','likes','collections','images','characters'];
+  const PLACEHOLDER_PAGES = ['batch','models','styles','likes','collections','characters'];
 
   return (
     <div className="app">
@@ -1144,6 +1221,7 @@ export default function App() {
             onRefine={handleRefine}
             onOpenDetail={(msg, imgIdx) => setDetail({ images: msg.images??[], idx: imgIdx, prompt: msg.prompt??'', brand: brand??undefined })}
             attached={attached} setAttached={setAttached}
+            onReset={() => setStream([])}
           />
         )}
 
@@ -1155,6 +1233,7 @@ export default function App() {
           <BrandEditor brand={editingBrand} onBack={()=>setPage('brands')} onSave={handleSaveBrand}/>
         )}
 
+        {page === 'images' && <ImagesPage images={savedImages} onOpen={(img) => setDetail({ images: [img.src], idx: 0, prompt: img.prompt })}/>}
         {PLACEHOLDER_PAGES.includes(page) && <PlaceholderPage page={page}/>}
       </div>
 
