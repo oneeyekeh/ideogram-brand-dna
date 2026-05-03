@@ -95,16 +95,17 @@ input, textarea { font: inherit; color: inherit; background: none; border: none;
 .prompt-chip-more { color: var(--text-3); font-size: 12px; border-style: dashed; }
 .prompt-chip-more:hover { color: var(--text-1); border-color: var(--accent); background: var(--accent-soft); border-style: dashed; }
 
-/* Prompt highlight — one word per prompt, just brighter than body */
-.prompt-hl { color: var(--text-1); }
-
 /* Prompt section — inline flip of explore gallery */
-.ps-grid { column-count: 3; column-gap: 12px; }
-.ps-card { display: inline-block; width: 100%; margin: 0 0 12px; text-align: left; background: var(--bg-1); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px 22px; cursor: pointer; transition: all 0.18s; break-inside: avoid; }
+.ps-category { margin-bottom: 32px; }
+.ps-cat-head { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+.ps-cat-name { font-size: 11px; text-transform: uppercase; letter-spacing: 0.13em; font-weight: 700; color: var(--text-1); white-space: nowrap; }
+.ps-cat-line { flex: 1; height: 1px; background: var(--line); }
+.ps-cat-count { font-size: 11px; color: var(--text-4); font-variant-numeric: tabular-nums; }
+.ps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; align-items: start; }
+.ps-card { text-align: left; background: var(--bg-1); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px 18px; cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; gap: 5px; }
 .ps-card:hover { border-color: var(--line-2); background: #141418; transform: translateY(-1px); }
-.ps-label { display: inline-flex; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-4); padding: 0 0 10px 0; }
-.ps-text { font-family: var(--serif); font-style: italic; font-size: 22px; line-height: 1.3; color: var(--text-2); letter-spacing: -0.01em; }
-.ps-card:hover .ps-text { color: var(--text-1); }
+.ps-text { font-family: var(--serif); font-style: italic; font-size: 20px; line-height: 1.25; color: var(--text-1); letter-spacing: -0.01em; }
+.ps-desc { font-size: 12px; color: var(--text-3); line-height: 1.4; }
 .explore-gallery-grid { column-count: 4; column-gap: 10px; }
 .gallery-image { display: inline-block; width: 100%; margin: 0 0 10px; border-radius: 12px; cursor: pointer; transition: transform 0.18s; border: 1px solid var(--line); overflow: hidden; background: var(--bg-1); break-inside: avoid; transform-origin: center; }
 .gallery-image img { width: 100%; height: auto; display: block; }

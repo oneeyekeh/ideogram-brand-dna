@@ -130,79 +130,109 @@ const DEFAULT_BRANDS: Brand[] = [
   { id: 'plume', name: 'Plume Studio', logoText: 'Plume', palette: ['#FFE5EC','#FF7AA2','#5B1339','#FFFFFF'], voice: 'Playful, bold, expressive.', edited: '3d ago', keywords: ['soft pinks','high contrast','paper textures'], samples: ['grad-2','grad-5','grad-8'] },
 ];
 
-const PROMPT_SUGGESTIONS: { label: string; prompt: string; hero: string }[] = [
+interface PromptPreset {
+  id: string;
+  category: string;
+  label: string;
+  description: string;
+  prompt_template: string;
+}
+
+const PRESET_CATEGORIES = ['Social Media', 'Product', 'Campaign', 'Brand Storytelling'];
+
+const PROMPT_SUGGESTIONS: PromptPreset[] = [
   {
-    label: 'Hard Light',
-    prompt: 'Single hard light source, sharp cast shadow, clinical white background. Nothing hidden. The object earns every pixel.',
-    hero: 'hard light',
+    id: 'instagram_feed',
+    category: 'Social Media',
+    label: 'Instagram Feed Post',
+    description: 'Square, scroll-stopping product shot for the feed',
+    prompt_template: 'Square format lifestyle product shot of {product}, clean composition, brand colors {colors} prominent, styled and polished, natural light, Instagram editorial aesthetic, no text',
   },
   {
-    label: 'Golden Hour',
-    prompt: 'Backlit against a warm blown-out sky. Silhouette rim glow, cinematic lens flare at the edge. Shallow depth of field, dreamy and saturated — the kind of light that makes anything look like it matters.',
-    hero: 'backlit',
+    id: 'instagram_story',
+    category: 'Social Media',
+    label: 'Instagram Story / Reel Cover',
+    description: 'Vertical format, bold crop, space for text overlay',
+    prompt_template: 'Vertical 9:16 product image of {product}, bold graphic composition, subject in lower third, top half open and negative space for text overlay, brand colors {colors}, lifestyle feel',
   },
   {
-    label: 'Overhead',
-    prompt: 'Flat lay, top-down, one surface. Long graphic shadows from a single hard source. Negative space does the work.',
-    hero: 'top-down',
+    id: 'facebook_cover',
+    category: 'Social Media',
+    label: 'Facebook Event Cover',
+    description: 'Wide horizontal, energetic, promotion or event feel',
+    prompt_template: 'Wide horizontal 16:9 promotional image featuring {product}, energetic and inviting atmosphere, brand colors {colors}, event or campaign feel, no text',
   },
   {
-    label: 'Macro',
-    prompt: 'So close the surface becomes abstract. Grain, weave, pore, edge. No context — pure material.',
-    hero: 'abstract',
+    id: 'product_hero',
+    category: 'Product',
+    label: 'Clean Product Hero',
+    description: 'Isolated product, studio lighting, no distractions',
+    prompt_template: 'Professional studio product shot of {product}, isolated on clean simple background, soft studio lighting, sharp detail, brand colors {colors}, no text, commercial photography',
   },
   {
-    label: 'Wide Environmental',
-    prompt: 'Subject deliberately small in frame. Architecture or landscape fills the composition. The world it lives in matters as much as the object itself — scale, atmosphere, belonging.',
-    hero: 'small in frame',
+    id: 'product_in_use',
+    category: 'Product',
+    label: 'Product In Use',
+    description: 'Someone naturally using or holding the product',
+    prompt_template: 'Candid lifestyle photo of a person naturally using or holding {product}, authentic moment, soft natural light, brand colors {colors} present in scene, shallow depth of field, no text',
   },
   {
-    label: 'Window Light',
-    prompt: 'Overcast north window, soft and directionless. No harsh shadows. Still life tradition, modern restraint. Linen or aged wood surface.',
-    hero: 'soft',
+    id: 'product_flatlay',
+    category: 'Product',
+    label: 'Product Flat Lay',
+    description: 'Top-down arranged shot with complementary props',
+    prompt_template: 'Overhead flat lay of {product} with complementary styled props on a clean surface, top-down angle, editorial composition, brand colors {colors}, natural light, no text',
   },
   {
-    label: 'Story Vertical',
-    prompt: '9:16, bold graphic crop. Object at the bottom third, top half open and breathing. Built for the scroll.',
-    hero: '9:16',
+    id: 'product_apparel',
+    category: 'Product',
+    label: 'Apparel / Wearable Shot',
+    description: 'Clothing or accessory on model or mannequin',
+    prompt_template: 'Fashion editorial shot of {product} worn by a model, clean studio or lifestyle background, full body or half body, brand colors {colors}, professional lighting, no text',
   },
   {
-    label: 'Cinematic',
-    prompt: 'Widescreen 2.39:1 letterbox. Muted film grade, gentle grain, practical lighting only. Like a single frame lifted from a slow-cinema film — object placed with intention, not urgency. A quiet mood that rewards attention.',
-    hero: 'letterbox',
+    id: 'sale_promo',
+    category: 'Campaign',
+    label: 'Sale / Promo',
+    description: 'Bold, high-energy, space for price or offer text',
+    prompt_template: 'Bold promotional product image of {product}, high energy composition, vibrant brand colors {colors}, product as hero, generous negative space for text overlay, commercial and eye-catching, no text',
   },
   {
-    label: 'After Dark',
-    prompt: 'Neon or tungsten practical light, deep shadow, colour cast. Imperfect exposure. Urban, a little raw, genuinely alive.',
-    hero: 'neon',
+    id: 'seasonal',
+    category: 'Campaign',
+    label: 'Seasonal Moment',
+    description: 'Product tied to a season or holiday with atmosphere',
+    prompt_template: 'Seasonal lifestyle image of {product} in a {season} setting, contextual atmosphere and props that match the season, brand colors {colors} woven into scene, warm and editorial, no text',
   },
   {
-    label: 'Double Exposure',
-    prompt: 'Product form layered with botanical or architectural texture. Tones bleeding through, painterly and surreal. Still unmistakably commercial — the tension between the two is the image.',
-    hero: 'layered',
+    id: 'new_arrival',
+    category: 'Campaign',
+    label: 'New Arrival / Launch',
+    description: 'Fresh, exciting, product as the undisputed hero',
+    prompt_template: 'Premium launch image of {product}, fresh and exciting composition, product as absolute hero, clean and elevated aesthetic, brand colors {colors}, sense of newness and quality, no text',
   },
   {
-    label: 'Monochrome',
-    prompt: 'Strip the colour, keep the form. High contrast or barely-there tones — your call. Shape and light are everything now.',
-    hero: 'monochrome',
+    id: 'behind_scenes',
+    category: 'Brand Storytelling',
+    label: 'Behind the Scenes',
+    description: 'Craft, process, workspace — human and authentic',
+    prompt_template: 'Behind the scenes photo of {product} being made or prepared, hands at work, craft and process visible, warm authentic light, brand colors {colors} present naturally in environment, documentary feel, no text',
   },
   {
-    label: 'Candid',
-    prompt: 'Fast, imperfect, real. Motion blur acceptable. The moment matters more than the setup. Feels found, not staged.',
-    hero: 'imperfect',
+    id: 'lifestyle_aspirational',
+    category: 'Brand Storytelling',
+    label: 'Lifestyle / Aspirational',
+    description: 'Sells the feeling and world around the brand',
+    prompt_template: 'Aspirational lifestyle image that evokes the world of {brand}, no hard product focus, atmosphere and feeling over literal product, brand colors {colors}, editorial and evocative, no text',
+  },
+  {
+    id: 'customer_moment',
+    category: 'Brand Storytelling',
+    label: 'Customer Moment',
+    description: 'Real-feeling scene of someone enjoying the product',
+    prompt_template: 'Warm candid lifestyle photo of a happy customer enjoying {product}, relatable and authentic scene, natural light, brand colors {colors} present in environment, genuine and human, no text',
   },
 ];
-
-function highlightText(text: string, hero: string): React.ReactNode {
-  if (!hero) return text;
-  const escaped = hero.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = new RegExp(`(${escaped})`, 'gi');
-  const parts = text.split(pattern);
-  const hl = hero.toLowerCase();
-  return parts.map((p, i) =>
-    p.toLowerCase() === hl ? <span key={i} className="prompt-hl">{p}</span> : p
-  );
-}
 
 const GALLERY_IMAGES = [
   'Pg48FMPgTI-rmB9PLU4gKg@2k.webp',
@@ -816,18 +846,30 @@ function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail, debugDoc
 function PromptSection({ onSelect, onBack }: { onSelect: (p: string) => void; onBack: () => void }) {
   return (
     <div style={{marginTop: 32, animation: 'fadeSlideUp 0.22s ease both'}}>
-      <div className="sec-head" style={{marginTop: 0, marginBottom: 18}}>
-        <h2>Prompt <em>ideas</em></h2>
-        <button className="more" onClick={onBack}>← Explore creations</button>
+      <div className="sec-head" style={{marginTop: 0, marginBottom: 28}}>
+        <h2>Prompt <em>presets</em></h2>
+        <button className="more" onClick={onBack}>← Explore</button>
       </div>
-      <div className="ps-grid">
-        {PROMPT_SUGGESTIONS.map((s, i) => (
-          <button key={i} className="ps-card" onClick={() => onSelect(s.prompt)}>
-            <span className="ps-label">{s.label}</span>
-            <p className="ps-text">{highlightText(s.prompt, s.hero)}</p>
-          </button>
-        ))}
-      </div>
+      {PRESET_CATEGORIES.map(cat => {
+        const items = PROMPT_SUGGESTIONS.filter(s => s.category === cat);
+        return (
+          <div key={cat} className="ps-category">
+            <div className="ps-cat-head">
+              <span className="ps-cat-name">{cat}</span>
+              <div className="ps-cat-line"/>
+              <span className="ps-cat-count">{items.length}</span>
+            </div>
+            <div className="ps-grid">
+              {items.map(s => (
+                <button key={s.id} className="ps-card" onClick={() => onSelect(s.prompt_template)}>
+                  <p className="ps-text">{s.label}</p>
+                  <p className="ps-desc">{s.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -910,14 +952,17 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
         activePreset={activePreset} setPreset={setPreset}
         openCreateBrand={openCreateBrand} attached={attached} setAttached={setAttached}/>
       <div className="prompt-chips">
-        {PROMPT_SUGGESTIONS.slice(0, 3).map((s, i) => (
-          <button key={i} className="prompt-chip" onClick={() => setPrompt(s.prompt)}>
-            <span className="chip-cat">{s.label}</span>
-            <span className="chip-text">{s.prompt.length > 42 ? s.prompt.slice(0, 40) + '…' : s.prompt}</span>
-          </button>
-        ))}
+        {PRESET_CATEGORIES.slice(0, 3).map(cat => {
+          const s = PROMPT_SUGGESTIONS.find(p => p.category === cat)!;
+          return (
+            <button key={cat} className="prompt-chip" onClick={() => setPrompt(s.prompt_template)}>
+              <span className="chip-cat">{cat}</span>
+              <span className="chip-text">{s.label}</span>
+            </button>
+          );
+        })}
         <button className="prompt-chip prompt-chip-more" onClick={() => setShowGallery(v => !v)}>
-          {showGallery ? '← Gallery' : 'More prompts →'}
+          {showGallery ? '← Gallery' : 'All presets →'}
         </button>
       </div>
       {showGallery
