@@ -77,7 +77,7 @@ OUTPUT STANDARD:
 //
 // Priority hierarchy (enforced in text):
 //   1. Brand logo  → render faithfully when logo appears in scene
-//   2. Reference images → primary source for visual style / mood / lighting
+//   2. Campaign references → generation-specific visual guidance
 //   3. Color palette → fallback for color decisions not covered by refs
 //   4. Voice & feel → emotional tone across all visual choices
 // ─────────────────────────────────────────────────────────────────────────────
@@ -113,8 +113,9 @@ function buildBrandContext(brand: BrandDNA, hasLogo: boolean, refCount: number):
     lines.push('  [No logo attached] — do not invent a logo.');
   }
   if (refCount > 0) {
-    lines.push(`  [${refCount} REFERENCE IMAGE(S) ATTACHED] — see images following the logo.`);
-    lines.push('  These images define the brand\'s visual language. Study them carefully.');
+    lines.push(`  [${refCount} CAMPAIGN REFERENCE IMAGE(S) ATTACHED] — see images following the logo.`);
+    lines.push('  These are per-generation campaign references supplied by the user.');
+    lines.push('  Use them together with the brand identity to create the requested campaign image.');
   } else {
     lines.push('  [No reference images] — derive visual style from palette and voice only.');
   }
@@ -137,15 +138,13 @@ function buildBrandContext(brand: BrandDNA, hasLogo: boolean, refCount: number):
   }
 
   if (refCount > 0) {
-    lines.push('REFERENCE IMAGES (HIGHEST PRIORITY for visual style):');
-    lines.push('  • These images ARE the brand\'s visual identity — they override everything');
-    lines.push('    else when it comes to aesthetic decisions.');
-    lines.push('  • Replicate exactly: lighting quality, color grading, texture, grain,');
-    lines.push('    depth of field, shadow softness, highlight roll-off, and mood.');
-    lines.push('  • Match the compositional approach: negative space, subject framing,');
-    lines.push('    camera angle, and focal length feel.');
-    lines.push('  • If references use a specific style (film, studio, editorial, lifestyle),');
-    lines.push('    reproduce that style precisely in the output.');
+    lines.push('CAMPAIGN REFERENCE IMAGES:');
+    lines.push('  • These images are user-provided campaign references for THIS generation.');
+    lines.push('  • Use them according to the user prompt: preserve the relevant subject,');
+    lines.push('    pose, product context, composition, lighting, or material cues as requested.');
+    lines.push('  • Blend the references with the active Brand DNA rather than replacing it.');
+    lines.push('  • The final image must feel like a campaign asset for this brand, informed by');
+    lines.push('    the supplied references and constrained by the brand palette, voice, and logo.');
     lines.push('');
   }
 
@@ -234,7 +233,7 @@ function buildFullPrompt(
 // of each image before processing it. Order:
 //   1. Full text prompt (brand context + preset + quality + task)
 //   2. [label] "BRAND LOGO" + logo inlineData
-//   3. [label] "REFERENCE IMAGE N of M" + ref inlineData (up to 4)
+//   3. [label] "REFERENCE IMAGE N of M" + ref inlineData (up to 5)
 //   4. [task reinforcement] — re-states scene + quality bar after all images
 //
 // The label-before-image pattern is the key to reliable multi-image grounding.
@@ -261,16 +260,16 @@ function buildApiParts(
     parts.push({ inlineData: { mimeType: logoImage.mimeType, data: logoImage.data } });
   }
 
-  // Reference images: numbered labels so the model processes each distinctly
-  const refs = referenceImages.slice(0, 4);
+  // Campaign references: numbered labels so the model processes each distinctly
+  const refs = referenceImages.slice(0, 5);
   refs.forEach((img, i) => {
     parts.push({
       text:
-        `[REFERENCE IMAGE ${i + 1} of ${refs.length} — visual style guide]\n` +
-        `Study and internalize: lighting direction, color grading, texture quality, ` +
-        `depth of field, shadow character, highlight roll-off, and overall atmosphere. ` +
-        `This is how "${brand?.name ?? 'this brand'}" looks and feels. ` +
-        `Your output must match this visual language precisely.`,
+        `[CAMPAIGN REFERENCE IMAGE ${i + 1} of ${refs.length}]\n` +
+        `Use this image as a generation-specific reference. Interpret it through the ` +
+        `user prompt and the "${brand?.name ?? 'selected brand'}" Brand DNA: carry over ` +
+        `the relevant subject, pose, product context, composition, lighting, textures, ` +
+        `or mood only where they help create the requested campaign image.`,
     });
     parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
   });
@@ -290,7 +289,7 @@ function buildApiParts(
   }
   if (refs.length > 0) {
     reinforcement.push(
-      `STYLE: Match the lighting, palette, and mood from the ${refs.length} reference image(s) exactly.`
+      `REFERENCES: Use the ${refs.length} campaign reference image(s) according to the user prompt, while preserving Brand DNA.`
     );
   }
   reinforcement.push(
@@ -386,7 +385,7 @@ export async function POST(req: NextRequest) {
   }
 
   const hasLogo = !!logoImage;
-  const refCount = Math.min(referenceImages.length, 4);
+  const refCount = Math.min(referenceImages.length, 5);
 
   // Build parts once — reused for both parallel generation calls
   const fullPrompt = buildFullPrompt(prompt.trim(), brand, preset, hasLogo, refCount);

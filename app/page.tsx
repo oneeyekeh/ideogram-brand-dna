@@ -4,12 +4,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface ReferenceImage {
-  id: string;
-  data: string;
-  mimeType: string;
-}
-
 interface AttachedImage {
   dataURL: string;
   mimeType: string;
@@ -26,7 +20,6 @@ interface Brand {
   edited: string;
   keywords: string[];
   samples: string[];
-  referenceImages: ReferenceImage[];
 }
 
 interface StreamMessage {
@@ -35,7 +28,8 @@ interface StreamMessage {
   loading?: boolean;
   images?: string[];
   prompt?: string;
-  attachedImage?: string;
+  attachedImages?: string[];
+  referenceImages?: AttachedImage[];
   error?: string;
   variant?: 'regen' | 'refine';
 }
@@ -110,10 +104,10 @@ function Icon({ name, size = 16, stroke = 1.6 }: { name: string; size?: number; 
 // ── Static data ───────────────────────────────────────────────────────────────
 
 const DEFAULT_BRANDS: Brand[] = [
-  { id: 'foundry', name: 'Foundry Coffee', logoText: 'Foundry', palette: ['#3D1F12','#C97A3A','#E9D5B5','#F5EBDB'], voice: 'Earthy, crafted, slow.', edited: '2d ago', keywords: ['warm grain','matte ceramic','shadow play'], samples: ['grad-1','grad-3','grad-9'], referenceImages: [] },
-  { id: 'aria', name: 'Aria Skincare', logoText: 'aria', palette: ['#F5E6D3','#E8C5A0','#A87856','#3F2A1E'], voice: 'Soft, considered, luminous.', edited: '5h ago', keywords: ['diffused light','milky beige','glassy'], samples: ['grad-6','grad-2','grad-11'], referenceImages: [] },
-  { id: 'monsoon', name: 'Monsoon Tech', logoText: 'Monsoon', palette: ['#0F1F3A','#4A90E2','#8FB8E8','#FFFFFF'], voice: 'Confident, calm, technical.', edited: 'last week', keywords: ['cool gradients','blue glass','clean type'], samples: ['grad-7','grad-12','grad-4'], referenceImages: [] },
-  { id: 'plume', name: 'Plume Studio', logoText: 'Plume', palette: ['#FFE5EC','#FF7AA2','#5B1339','#FFFFFF'], voice: 'Playful, bold, expressive.', edited: '3d ago', keywords: ['soft pinks','high contrast','paper textures'], samples: ['grad-2','grad-5','grad-8'], referenceImages: [] },
+  { id: 'foundry', name: 'Foundry Coffee', logoText: 'Foundry', palette: ['#3D1F12','#C97A3A','#E9D5B5','#F5EBDB'], voice: 'Earthy, crafted, slow.', edited: '2d ago', keywords: ['warm grain','matte ceramic','shadow play'], samples: ['grad-1','grad-3','grad-9'] },
+  { id: 'aria', name: 'Aria Skincare', logoText: 'aria', palette: ['#F5E6D3','#E8C5A0','#A87856','#3F2A1E'], voice: 'Soft, considered, luminous.', edited: '5h ago', keywords: ['diffused light','milky beige','glassy'], samples: ['grad-6','grad-2','grad-11'] },
+  { id: 'monsoon', name: 'Monsoon Tech', logoText: 'Monsoon', palette: ['#0F1F3A','#4A90E2','#8FB8E8','#FFFFFF'], voice: 'Confident, calm, technical.', edited: 'last week', keywords: ['cool gradients','blue glass','clean type'], samples: ['grad-7','grad-12','grad-4'] },
+  { id: 'plume', name: 'Plume Studio', logoText: 'Plume', palette: ['#FFE5EC','#FF7AA2','#5B1339','#FFFFFF'], voice: 'Playful, bold, expressive.', edited: '3d ago', keywords: ['soft pinks','high contrast','paper textures'], samples: ['grad-2','grad-5','grad-8'] },
 ];
 
 const PROMPT_SUGGESTIONS = [
@@ -232,10 +226,9 @@ function useLocalStorage<T>(key: string, initial: T): [T, React.Dispatch<React.S
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
-function Sidebar({ page, setPage, activeBrand, brands }: {
-  page: string; setPage: (p: string) => void; activeBrand: string | null; brands: Brand[];
+function Sidebar({ page, setPage }: {
+  page: string; setPage: (p: string) => void;
 }) {
-  const brand = brands.find(b => b.id === activeBrand);
   const item = (id: string, icon: string, label: string, badge?: string) => (
     <button key={id} className={`sb-item ${page === id ? 'active' : ''}`} onClick={() => setPage(id)}>
       <Icon name={icon} size={15}/><span>{label}</span>
@@ -257,17 +250,6 @@ function Sidebar({ page, setPage, activeBrand, brands }: {
       {item('brands','dna','Brand DNA','New')}
       {item('characters','user','Characters')}
       <div className="sb-foot">
-        <div className="sb-credits">
-          <div className="lbl">Active brand</div>
-          <div className="val" style={{display:'flex',alignItems:'center',gap:8}}>
-            {brand ? (
-              <><span style={{display:'flex',height:14,width:24,borderRadius:3,overflow:'hidden'}}>
-                {brand.palette.slice(0,4).map((c,i)=><span key={i} style={{flex:1,background:c}}/>)}
-              </span><span style={{fontSize:12}}>{brand.name.split(' ')[0]}</span></>
-            ) : <span style={{fontSize:12,color:'var(--text-3)'}}>None</span>}
-          </div>
-          <button className="upgrade" onClick={()=>setPage('brands')}>Manage brands</button>
-        </div>
         <button className="sb-user">
           <div className="sb-avatar">M</div>
           <div><div className="sb-user-name">Mary</div><div className="sb-user-plan">Plus plan</div></div>
@@ -285,7 +267,7 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
   brand: Brand | null; setActiveBrand: (id: string | null) => void;
   activePreset: string | null; setPreset: (id: string | null) => void;
   openCreateBrand: () => void; brands: Brand[];
-  attached: AttachedImage | null; setAttached: (img: AttachedImage | null) => void;
+  attached: AttachedImage[]; setAttached: React.Dispatch<React.SetStateAction<AttachedImage[]>>;
   compact?: boolean;
 }) {
   const [popOpen, setPopOpen] = useState(false);
@@ -299,10 +281,14 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
   }, []);
 
   const handleAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const dataURL = await resizeImage(file, 512, 0.75);
-    setAttached({ dataURL, mimeType: 'image/jpeg', name: file.name });
+    const files = Array.from(e.target.files ?? []).slice(0, Math.max(0, 5 - attached.length));
+    if (!files.length) return;
+    const refs = await Promise.all(files.map(async file => ({
+      dataURL: await resizeImage(file, 512, 0.75),
+      mimeType: 'image/jpeg',
+      name: file.name,
+    })));
+    setAttached(prev => [...prev, ...refs].slice(0, 5));
     e.target.value = '';
   };
 
@@ -312,11 +298,20 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
 
   return (
     <div className="composer">
-      {attached && (
-        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,padding:'6px 8px',background:'var(--bg-3)',borderRadius:8}}>
-          <img src={attached.dataURL} alt="" style={{width:36,height:36,borderRadius:6,objectFit:'cover'}}/>
-          <span style={{fontSize:12,color:'var(--text-2)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{attached.name}</span>
-          <button onClick={()=>setAttached(null)} style={{color:'var(--text-3)',display:'flex'}}><Icon name="x" size={12}/></button>
+      {attached.length > 0 && (
+        <div className="composer-refs">
+          {attached.map((img, idx) => (
+            <div key={`${img.name}-${idx}`} className="composer-ref">
+              <img src={img.dataURL} alt="" />
+              <button
+                onClick={() => setAttached(prev => prev.filter((_, i) => i !== idx))}
+                aria-label="Remove reference image"
+              >
+                <Icon name="x" size={9}/>
+              </button>
+            </div>
+          ))}
+          <span className="composer-ref-count">{attached.length}/5 refs</span>
         </div>
       )}
       <textarea
@@ -327,10 +322,10 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
       />
       <div className="composer-tools">
         {/* Image attach */}
-        <button className="tool-pill" onClick={()=>fileRef.current?.click()} title="Attach image">
-          <Icon name="paperclip" size={11}/>
+        <button className="tool-pill" onClick={()=>fileRef.current?.click()} title="Attach up to 5 campaign reference images">
+          <Icon name="paperclip" size={11}/> References {attached.length ? `${attached.length}/5` : ''}
         </button>
-        <input ref={fileRef} type="file" className="upload-input" accept="image/*" onChange={handleAttach}/>
+        <input ref={fileRef} type="file" className="upload-input" accept="image/*" multiple onChange={handleAttach}/>
 
         {/* Brand DNA picker */}
         <div style={{position:'relative'}} ref={popRef}>
@@ -367,7 +362,7 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
 
         <button className="tool-pill"><Icon name="ratio" size={11}/> 1:1</button>
         <div className="spacer"/>
-        <button className="send-btn" onClick={onSend} disabled={!value.trim() && !attached}>
+        <button className="send-btn" onClick={onSend} disabled={!value.trim() && attached.length === 0}>
           <Icon name="arrowU" size={14} stroke={2.2}/>
         </button>
       </div>
@@ -551,7 +546,7 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
   onRegenerate: (msg: StreamMessage) => void;
   onRefine: (msg: StreamMessage, state: RefineState) => void;
   onOpenDetail: (msg: StreamMessage, imgIdx: number) => void;
-  attached: AttachedImage | null; setAttached: (img: AttachedImage | null) => void;
+  attached: AttachedImage[]; setAttached: React.Dispatch<React.SetStateAction<AttachedImage[]>>;
   onReset: () => void;
 }) {
   const active = stream.length > 0;
@@ -574,12 +569,13 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
           <div className="chat-stream">
             {stream.map((m,i)=>(
               m.role==='user' ? (
-                <div key={i} className={`msg-user ${m.variant ? `msg-user-${m.variant}` : ''}`}>
-                  {m.attachedImage && (
-                    <img src={m.attachedImage} alt="" style={{display:'block',width:120,borderRadius:8,marginBottom:6,objectFit:'cover'}}/>
-                  )}
-                  {m.text}
-                </div>
+                m.attachedImages?.length ? (
+                  <div key={i} className={`msg-user ${m.variant ? `msg-user-${m.variant}` : ''}`}>
+                    <div className="msg-ref-grid">
+                      {m.attachedImages.map((src, j) => <img key={j} src={src} alt="" />)}
+                    </div>
+                  </div>
+                ) : null
               ) : (
                 <div key={i} className={`msg-asst ${m.variant ? `msg-asst-${m.variant}` : ''}`}>
                   <div className="asst-head">
@@ -591,7 +587,7 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
                     </span>
                   </div>
                   {!m.loading && m.error && <div className="error-banner">{m.error}</div>}
-                  {!m.loading && !m.error && (
+                  {!m.loading && !m.error && m.text && (
                     <div style={{fontSize:12,color:'var(--text-2)'}}>{m.text}</div>
                   )}
                 </div>
@@ -676,12 +672,6 @@ function BrandsPage({ brands, activeBrand, setActiveBrand, onCreate, onEdit }: {
                     <Icon name="edit" size={12}/>
                   </button>
                 </div>
-                {/* Ref count */}
-                {b.referenceImages.length > 0 && (
-                  <div style={{marginTop:8, fontSize:10, color:'var(--text-4)', display:'flex', alignItems:'center', gap:4}}>
-                    <Icon name="image2" size={10}/> {b.referenceImages.length} ref image{b.referenceImages.length!==1?'s':''}
-                  </div>
-                )}
               </div>
             );
           })}
@@ -713,26 +703,18 @@ function BrandEditor({ brand: init, onBack, onSave }: {
   const [palette, setPalette] = useState<string[]>(init?.palette ?? []);
   const [logoImage, setLogoImage] = useState<string|undefined>(init?.logoImage);
   const [logoText, setLogoText] = useState(init?.logoText ?? '');
-  const [refImages, setRefImages] = useState<ReferenceImage[]>(init?.referenceImages ?? []);
   const [detecting, setDetecting] = useState(false);
   const logoRef = useRef<HTMLInputElement>(null);
-  const refRef = useRef<HTMLInputElement>(null);
   const customColorRef = useRef<HTMLInputElement>(null);
 
-  const refreshCandidates = useCallback(async (logo: string | undefined, refs: ReferenceImage[]) => {
+  const refreshCandidates = useCallback(async (logo: string | undefined) => {
     setDetecting(true);
     const seen = new Set<string>();
     const push = (cols: string[], out: string[]) => {
       for (const c of cols) { if (!seen.has(c)) { seen.add(c); out.push(c); } }
     };
     const all: string[] = [];
-    // Logo is primary — extract up to 10 vivid colors from it
     if (logo) push(await extractDominantColors(logo, 10), all);
-    // Refs fill remaining slots (2 each)
-    for (const ref of refs.slice(0, 4)) {
-      if (all.length >= 14) break;
-      push(await extractDominantColors(ref.data, 3), all);
-    }
     const final = all.slice(0, 14);
     setCandidates(final);
     // Auto-select top 5 if user hasn't curated yet
@@ -745,26 +727,7 @@ function BrandEditor({ brand: init, onBack, onSave }: {
     const d = await resizeImage(f, 800, 0.85);
     setLogoImage(d);
     if (!logoText) setLogoText(f.name.replace(/\.[^.]+$/, ''));
-    await refreshCandidates(d, refImages);
-  };
-
-  const handleRefs = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    const newRefs: ReferenceImage[] = [];
-    for (const f of files.slice(0, 5 - refImages.length)) {
-      const d = await resizeImage(f, 512, 0.75);
-      newRefs.push({ id: Math.random().toString(36).slice(2), data: d, mimeType: 'image/jpeg' });
-    }
-    const updated = [...refImages, ...newRefs];
-    setRefImages(updated);
-    await refreshCandidates(logoImage, updated);
-    e.target.value = '';
-  };
-
-  const removeRef = async (id: string) => {
-    const updated = refImages.filter(r => r.id !== id);
-    setRefImages(updated);
-    await refreshCandidates(logoImage, updated);
+    await refreshCandidates(d);
   };
 
   const toggleColor = (c: string) => {
@@ -783,7 +746,6 @@ function BrandEditor({ brand: init, onBack, onSave }: {
       name: name.trim(), logoText: logoText || name.split(' ')[0], logoImage,
       palette, voice: voice.trim(), edited: 'just now',
       keywords: [], samples: init?.samples ?? ['grad-1', 'grad-3', 'grad-9'],
-      referenceImages: refImages,
     });
   };
 
@@ -837,7 +799,7 @@ function BrandEditor({ brand: init, onBack, onSave }: {
                     <div style={{display:'flex',gap:6}}>
                       <input className="input" style={{flex:1,padding:'5px 9px',fontSize:11}} placeholder="Wordmark text"
                         value={logoText} onChange={e => setLogoText(e.target.value)}/>
-                      <button className="btn-icon" onClick={async () => { setLogoImage(undefined); setLogoText(''); await refreshCandidates(undefined, refImages); }}>
+                      <button className="btn-icon" onClick={async () => { setLogoImage(undefined); setLogoText(''); await refreshCandidates(undefined); }}>
                         <Icon name="trash" size={12}/>
                       </button>
                     </div>
@@ -847,41 +809,16 @@ function BrandEditor({ brand: init, onBack, onSave }: {
               <input ref={logoRef} type="file" className="upload-input" accept="image/*" onChange={handleLogo}/>
             </div>
 
-            {/* 3 — Reference imagery */}
+            {/* 3 — Color palette: toggleable candidates */}
             <div className="section-block">
               <div className="section-h-form">
-                <span className="section-num">3</span> Reference images
-                <span style={{marginLeft:'auto',fontSize:10,color:'var(--accent-text)',background:'var(--accent-soft)',padding:'2px 8px',borderRadius:100}}>Highest priority</span>
-              </div>
-              <div className="ref-grid" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
-                {refImages.map(img => (
-                  <div key={img.id} className="ref-tile" style={{position:'relative'}}>
-                    <img src={img.data} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                    <button onClick={() => removeRef(img.id)}
-                      style={{position:'absolute',top:3,right:3,width:18,height:18,borderRadius:4,background:'rgba(0,0,0,0.7)',color:'white',display:'grid',placeItems:'center'}}>
-                      <Icon name="x" size={9}/>
-                    </button>
-                  </div>
-                ))}
-                {Array.from({length: Math.max(0, 5 - refImages.length)}).map((_, i) => (
-                  <div key={`add-${i}`} className="ref-tile add" onClick={() => refRef.current?.click()}>
-                    <Icon name="plus" size={13}/>
-                  </div>
-                ))}
-              </div>
-              <input ref={refRef} type="file" className="upload-input" accept="image/*" multiple onChange={handleRefs}/>
-            </div>
-
-            {/* 4 — Color palette: toggleable candidates */}
-            <div className="section-block">
-              <div className="section-h-form">
-                <span className="section-num">4</span> Color palette
+                <span className="section-num">3</span> Color palette
                 {detecting && <span style={{marginLeft:8,fontSize:10,color:'var(--text-3)'}}>Detecting…</span>}
                 <span style={{marginLeft:'auto',fontSize:10,color:'var(--text-4)'}}>Tap to select · {palette.length} chosen</span>
               </div>
 
               {candidates.length === 0 && !detecting && (
-                <p style={{fontSize:12,color:'var(--text-4)',margin:'4px 0 8px'}}>Upload a logo or reference images to auto-detect brand colors.</p>
+                <p style={{fontSize:12,color:'var(--text-4)',margin:'4px 0 8px'}}>Upload a logo to auto-detect brand colors.</p>
               )}
 
               {/* Candidate swatches — tap to toggle */}
@@ -943,12 +880,6 @@ function BrandEditor({ brand: init, onBack, onSave }: {
               <div className="preview-pal">{palette.map((c, i) => <span key={i} style={{background:c}}/>)}</div>
             )}
             <div className="preview-row"><span className="k">Voice</span><span style={{maxWidth:160,textAlign:'right',fontSize:11}}>{voice || 'Not set'}</span></div>
-            <div className="preview-row">
-              <span className="k">References</span>
-              <span style={{color:refImages.length>0?'#C7F25E':'var(--text-3)'}}>
-                {refImages.length > 0 ? `${refImages.length} / 5 ✓` : '0 / 5'}
-              </span>
-            </div>
             <div className="preview-row">
               <span className="k">Logo</span>
               <span style={{color:logoImage?'#C7F25E':'var(--text-3)'}}>{logoImage ? 'Uploaded' : 'None'}</span>
@@ -1119,26 +1050,17 @@ export default function App() {
   const [prompt, setPrompt] = useState('');
   const [activePreset, setActivePreset] = useState<string|null>(null);
   const [detail, setDetail] = useState<DetailState|null>(null);
-  const [attached, setAttached] = useState<AttachedImage|null>(null);
+  const [attached, setAttached] = useState<AttachedImage[]>([]);
   const [savedImages, setSavedImages] = useState<SavedImage[]>([]);
 
   const brand = brands.find(b => b.id === activeBrand) ?? null;
 
   const generateImages = useCallback(async (
-    userPrompt: string, msgIdx: number, attachedImg: AttachedImage | null
+    userPrompt: string, msgIdx: number, attachedRefs: AttachedImage[]
   ) => {
     const currentBrand = brands.find(b => b.id === activeBrand) ?? null;
 
-    const refImages = (currentBrand?.referenceImages ?? []).slice(0,3).map(img => {
-      const { data, mimeType } = dataURLtoBase64(img.data);
-      return { data, mimeType };
-    });
-
-    // If user attached an image, prepend it to references
-    if (attachedImg) {
-      const { data, mimeType } = dataURLtoBase64(attachedImg.dataURL);
-      refImages.unshift({ data, mimeType });
-    }
+    const refImages = attachedRefs.slice(0, 5).map(img => dataURLtoBase64(img.dataURL));
 
     let logoData: { data: string; mimeType: string } | undefined;
     if (currentBrand?.logoImage) logoData = dataURLtoBase64(currentBrand.logoImage);
@@ -1150,7 +1072,7 @@ export default function App() {
         body: JSON.stringify({
           prompt: userPrompt,
           brand: currentBrand ? { name: currentBrand.name, voice: currentBrand.voice, keywords: currentBrand.keywords, palette: currentBrand.palette } : null,
-          referenceImages: refImages.slice(0,3),
+          referenceImages: refImages,
           logoImage: logoData,
           preset: activePreset,
         }),
@@ -1180,6 +1102,7 @@ export default function App() {
           text: `Generated ${cappedImages.length} image${cappedImages.length!==1?'s':''}${currentBrand?` with ${currentBrand.name} DNA`:''}`,
           images: cappedImages,
           prompt: userPrompt,
+          referenceImages: attachedRefs,
         };
         return next;
       });
@@ -1187,21 +1110,21 @@ export default function App() {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setStream(prev => {
         const next = [...prev];
-        next[msgIdx] = { role: 'asst', images: [], prompt: userPrompt, error: message };
+        next[msgIdx] = { role: 'asst', images: [], prompt: userPrompt, referenceImages: attachedRefs, error: message };
         return next;
       });
     }
   }, [brands, activeBrand, activePreset]);
 
   const send = useCallback(() => {
-    if (!prompt.trim() && !attached) return;
+    if (!prompt.trim() && attached.length === 0) return;
     const userPrompt = prompt.trim() || 'Generate an on-brand image';
-    const snap = attached;
+    const snap = attached.slice(0, 5);
     setPrompt('');
-    setAttached(null);
+    setAttached([]);
 
     setStream(prev => {
-      const userMsg: StreamMessage = { role: 'user', text: userPrompt, attachedImage: snap?.dataURL };
+      const userMsg: StreamMessage = { role: 'user', text: userPrompt, attachedImages: snap.map(img => img.dataURL), referenceImages: snap };
       const loadingMsg: StreamMessage = { role: 'asst', loading: true };
       const next = [...prev, userMsg, loadingMsg];
       const idx = next.length - 1;
@@ -1217,7 +1140,7 @@ export default function App() {
       const loadingMsg: StreamMessage = { role: 'asst', loading: true, variant: 'regen' };
       const next = [...prev, userMsg, loadingMsg];
       const idx = next.length - 1;
-      setTimeout(() => generateImages(msg.prompt!, idx, null), 0);
+      setTimeout(() => generateImages(msg.prompt!, idx, msg.referenceImages ?? []), 0);
       return next;
     });
   }, [generateImages]);
@@ -1238,7 +1161,7 @@ export default function App() {
       const loadingMsg: StreamMessage = { role: 'asst', loading: true, variant: 'refine' };
       const next = [...prev, userMsg, loadingMsg];
       const idx = next.length - 1;
-      setTimeout(() => generateImages(refinedPrompt, idx, null), 0);
+      setTimeout(() => generateImages(refinedPrompt, idx, msg.referenceImages ?? []), 0);
       return next;
     });
   }, [generateImages]);
@@ -1258,7 +1181,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <Sidebar page={page} setPage={setPage} activeBrand={activeBrand} brands={brands}/>
+      <Sidebar page={page} setPage={setPage}/>
       <div className="main">
         <div className="top-strip"/>
 

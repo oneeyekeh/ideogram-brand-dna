@@ -39,10 +39,6 @@ input, textarea { font: inherit; color: inherit; background: none; border: none;
 .sb-item .badge { margin-left: auto; font-size: 10px; padding: 1px 6px; border-radius: 100px; background: var(--bg-3); color: var(--text-2); }
 
 .sb-foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
-.sb-credits { background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-.sb-credits .lbl { font-size: 11px; color: var(--text-3); margin-bottom: 2px; }
-.sb-credits .val { font-size: 13px; font-weight: 500; }
-.sb-credits .upgrade { display: block; width: 100%; margin-top: 8px; background: var(--accent); color: white; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; text-align: center; }
 .sb-user { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 7px; }
 .sb-user:hover { background: var(--bg-hover); }
 .sb-avatar { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, #FF7AA2, #C97A3A); display: grid; place-items: center; font-size: 10px; font-weight: 600; }
@@ -62,6 +58,12 @@ input, textarea { font: inherit; color: inherit; background: none; border: none;
 
 /* Composer */
 .composer { max-width: 720px; margin: 0 auto; background: #1C1C20; border: 1px solid var(--line-2); border-radius: 22px; padding: 14px 18px 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.35); }
+.composer-refs { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; padding: 6px 8px; background: var(--bg-3); border-radius: 10px; overflow-x: auto; scrollbar-width: none; }
+.composer-refs::-webkit-scrollbar { display: none; }
+.composer-ref { width: 42px; height: 42px; border-radius: 8px; overflow: hidden; position: relative; flex-shrink: 0; border: 1px solid var(--line-2); }
+.composer-ref img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.composer-ref button { position: absolute; top: 3px; right: 3px; width: 17px; height: 17px; border-radius: 5px; background: rgba(0,0,0,0.68); color: white; display: grid; place-items: center; }
+.composer-ref-count { margin-left: 2px; font-size: 11px; color: var(--text-3); white-space: nowrap; }
 .composer textarea { width: 100%; font-size: 14px; color: var(--text-1); min-height: 22px; max-height: 160px; line-height: 1.5; padding: 2px 0; }
 .composer textarea::placeholder { color: var(--text-3); }
 .composer-tools { display: flex; align-items: center; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
@@ -185,12 +187,6 @@ input, textarea { font: inherit; color: inherit; background: none; border: none;
 .type-card .preview { font-size: 22px; line-height: 1.1; margin-bottom: 6px; }
 .type-card .meta { font-size: 11px; color: var(--text-3); }
 
-.ref-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.ref-tile { aspect-ratio: 1; border-radius: 8px; border: 1px solid var(--line); overflow: hidden; }
-.ref-tile.add { border: 1.5px dashed var(--line-2); display: grid; place-items: center; color: var(--text-3); cursor: pointer; }
-.ref-tile.add:hover { border-color: var(--accent); color: var(--accent-text); }
-.ref-tile img { width: 100%; height: 100%; object-fit: cover; }
-
 /* Editor preview side */
 .editor-preview { background: var(--bg-1); border: 1px solid var(--line); border-radius: 14px; padding: 18px; position: sticky; top: 24px; height: fit-content; }
 .preview-h { font-size: 12px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
@@ -209,6 +205,8 @@ input, textarea { font: inherit; color: inherit; background: none; border: none;
 .chat-head-title { font-size: 13px; font-weight: 500; }
 .chat-stream { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 18px; }
 .msg-user { align-self: flex-end; max-width: 85%; background: var(--bg-2); border: 1px solid var(--line); padding: 10px 14px; border-radius: 14px 14px 2px 14px; font-size: 13px; line-height: 1.5; }
+.msg-ref-grid { display: grid; grid-template-columns: repeat(5, 42px); gap: 6px; }
+.msg-ref-grid img { width: 42px; height: 42px; border-radius: 7px; object-fit: cover; display: block; }
 .msg-asst { font-size: 13px; line-height: 1.5; }
 .asst-head { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-3); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em; }
 .asst-head .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }

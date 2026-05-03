@@ -15,8 +15,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## User flow
 
-1. **Brand DNA** (sidebar → Brand DNA) — create a brand: upload logo, pick colors, add reference images, describe voice.
-2. **Explore** — type a prompt, pick your brand from the pill in the composer, hit ↑.
+1. **Brand DNA** (sidebar → Brand DNA) — create a brand: upload logo, pick colors, describe voice.
+2. **Explore** — type a prompt, pick your brand from the pill in the composer, optionally attach up to five campaign reference images, hit ↑.
 3. **Batch** — chat panel left, generated images right. Two images generate in parallel via Gemini Flash Image.
 4. Click any image to open the detail view with download + variation thumbnails.
 
@@ -37,3 +37,4 @@ The API route tries these Gemini models in order (picks first that works):
 - React 18, TypeScript
 - Gemini API via direct HTTP (no SDK dependency)
 - Brand DNA stored in `localStorage`
+- Campaign reference images are attached per generation from the composer
