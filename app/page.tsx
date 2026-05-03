@@ -845,42 +845,9 @@ function feedbackKey(msgIndex: number, imgIndex: number) {
   return `${msgIndex}:${imgIndex}`;
 }
 
-function buildSessionReportMarkdown(stream: StreamMessage[], imageFeedback: ImageFeedback) {
-  const runs = stream.map((m, i) => ({ m, i })).filter(({ m }) => m.role === 'asst' && (m.prompt || m.trace));
-  const totalImages = runs.reduce((sum, { m }) => sum + (m.images?.length ?? 0), 0);
-  const useful = Object.values(imageFeedback).filter(v => v === 'up').length;
-  const notUseful = Object.values(imageFeedback).filter(v => v === 'down').length;
-  const campaigns = Array.from(new Set(runs.map(({ m }) => m.trace?.campaignType).filter(Boolean)));
-  const brands = Array.from(new Set(runs.map(({ m }) => m.trace?.brandName).filter(Boolean)));
-  const models = Array.from(new Set(runs.map(({ m }) => m.trace?.modelName).filter(Boolean)));
-  const logs = runs.flatMap(({ m }) => m.trace?.decisionLog ?? []).slice(0, 12);
 
-  return [
-    '# session-report.md',
-    '',
-    '## Summary',
-    `- Runs: ${runs.length}`,
-    `- Images generated: ${totalImages}`,
-    `- Useful: ${useful}`,
-    `- Not useful: ${notUseful}`,
-    `- Brands: ${brands.join(', ') || 'none'}`,
-    `- Campaign types: ${campaigns.join(', ') || 'none classified'}`,
-    `- Models: ${models.join(', ') || 'none returned'}`,
-    '',
-    '## Session Prompts',
-    ...runs.map(({ m, i }) => `- Run ${i}: ${(m.prompt ?? m.trace?.prompt ?? 'pending').replace(/\s+/g, ' ').slice(0, 220)}`),
-    '',
-    '## Model Decision Notes',
-    ...(logs.length ? logs.map(item => `- ${item}`) : ['- No decision log yet.']),
-    '',
-    '## Takeaway',
-    useful + notUseful > 0
-      ? `The user marked ${useful} image(s) useful and ${notUseful} image(s) not useful. Use this feedback to judge which prompts, references, and overrides produced stronger brand adherence.`
-      : 'No image feedback has been recorded yet. Ask the user to thumbs up/down outputs before using this report for model performance judgment.',
-  ].join('\n');
-}
-
-function ExploreResults({ stream, imageFeedback, onRateImage, onRegenerate, onRefine, onOpenDetail, debugDoc, setDebugDoc }: {
+function ExploreResults({ brand, stream, imageFeedback, onRateImage, onRegenerate, onRefine, onOpenDetail, debugDoc, setDebugDoc }: {
+  brand: Brand | null;
   stream: StreamMessage[];
   imageFeedback: ImageFeedback;
   onRateImage: (key: string, value: 'up' | 'down') => void;
@@ -891,8 +858,47 @@ function ExploreResults({ stream, imageFeedback, onRateImage, onRegenerate, onRe
   setDebugDoc: (doc: DebugDocState | null) => void;
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
-  // Track which block is in "refine mode" — keyed by stream index
   const [refining, setRefining] = useState<number | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+
+  const openSessionReport = async () => {
+    const runs = stream
+      .map((m, i) => ({ m, i }))
+      .filter(({ m }) => m.role === 'asst' && (m.prompt || m.trace))
+      .map(({ m, i }, ri) => ({
+        runNumber: ri + 1,
+        prompt: m.prompt ?? m.trace?.prompt ?? '',
+        imageCount: m.images?.length ?? 0,
+        feedback: (m.images ?? []).slice(0, 2).map((_, j) => imageFeedback[feedbackKey(i, j)] ?? null),
+      }));
+
+    const models = Array.from(new Set(
+      stream.map(m => m.trace?.modelName).filter((v): v is string => !!v)
+    ));
+
+    const totalImages = runs.reduce((s, r) => s + r.imageCount, 0);
+
+    setReportLoading(true);
+    try {
+      const res = await fetch('/api/session-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brand: brand ? { name: brand.name, palette: brand.palette ?? [], tone: brand.voice, hasLogo: !!brand.logoImage } : null,
+          runs,
+          totalImages,
+          models,
+        }),
+      });
+      const data = await res.json();
+      const markdown: string = data.markdown || `# Error\n${data.error ?? 'Unknown error'}`;
+      setDebugDoc({ title: 'session-report.md', markdown });
+    } catch (e) {
+      setDebugDoc({ title: 'session-report.md', markdown: `# Error\nFailed to generate report: ${String(e)}` });
+    } finally {
+      setReportLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (canvasRef.current) canvasRef.current.scrollTop = canvasRef.current.scrollHeight;
@@ -969,10 +975,12 @@ function ExploreResults({ stream, imageFeedback, onRateImage, onRegenerate, onRe
       ))}
       {asstMsgs.length > 0 && (
         <button
-          className="session-report-btn"
-          onClick={() => setDebugDoc({ title: 'session-report.md', markdown: buildSessionReportMarkdown(stream, imageFeedback) })}
+          className={`session-report-btn ${reportLoading ? 'loading' : ''}`}
+          onClick={openSessionReport}
+          disabled={reportLoading}
         >
-          <Icon name="layers" size={13}/> Session report
+          <Icon name="layers" size={13}/>
+          {reportLoading ? 'Generating report…' : 'Session report'}
         </button>
       )}
     </div>
@@ -1082,7 +1090,7 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
         </div>
 
         {/* Right: results */}
-        <ExploreResults stream={stream} imageFeedback={imageFeedback} onRateImage={onRateImage}
+        <ExploreResults brand={brand} stream={stream} imageFeedback={imageFeedback} onRateImage={onRateImage}
           onRegenerate={onRegenerate} onRefine={onRefine}
           onOpenDetail={onOpenDetail} debugDoc={debugDoc} setDebugDoc={setDebugDoc}/>
       </div>
