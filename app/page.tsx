@@ -1114,15 +1114,15 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
         brand={brand} setActiveBrand={setActiveBrand} brands={brands}
         activePreset={activePreset} setPreset={setPreset}
         openCreateBrand={openCreateBrand} attached={attached} setAttached={setAttached}/>
-      {showGallery
-        ? <PromptSection onSelect={p => setPrompt(p)}/>
-        : <ExploreGallery/>
-      }
       <div className="explore-section-bar">
         <button className="explore-section-toggle" onClick={() => setShowGallery(v => !v)}>
           {showGallery ? 'Explore creations' : 'Prompt presets'}
         </button>
       </div>
+      {showGallery
+        ? <PromptSection onSelect={p => setPrompt(p)}/>
+        : <ExploreGallery/>
+      }
     </div>
   );
 }

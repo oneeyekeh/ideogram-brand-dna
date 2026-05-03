@@ -87,7 +87,7 @@ input, textarea { font: inherit; color: inherit; background: none; border: none;
 .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Prompt chips — 3 preview pills + more button */
-.explore-section-bar { display: flex; justify-content: center; margin: 32px auto 8px; }
+.explore-section-bar { display: flex; justify-content: flex-end; max-width: 920px; margin: 24px auto 0; padding: 0 2px; }
 .explore-section-toggle { font-size: 12px; color: var(--text-3); padding: 6px 16px; border: 1px solid var(--line); border-radius: 100px; background: transparent; transition: all 0.15s; }
 .explore-section-toggle:hover { color: var(--text-1); border-color: var(--line-2); background: var(--bg-hover); }
 .prompt-chip:hover .chip-text { color: var(--accent-text); }
