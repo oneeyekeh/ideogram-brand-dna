@@ -156,6 +156,37 @@ const PROMPT_SUGGESTIONS: PromptPreset[] = [
   { id: 'customer_moment', category: 'Brand Storytelling', label: 'Customer Moment', prompt: 'Candid scene of a happy customer enjoying the product, warm and relatable, genuine and human, no text' },
 ];
 
+interface BrandingMod {
+  id: string;
+  label: string;
+  onLabel: string;
+  offLabel: string | null;
+  onTag: string;
+  offTag: string | null;
+  defaultOn: boolean;
+}
+
+const BRANDING_MODS: BrandingMod[] = [
+  { id: 'logo',        label: 'Logo',          onLabel: 'Logo visible',    offLabel: 'No logo',          onTag: 'logo accurately rendered and visible',        offTag: 'no logo',                     defaultOn: false },
+  { id: 'text',        label: 'Text',          onLabel: 'With text',       offLabel: 'No text',          onTag: 'brand name as text element in composition',   offTag: 'no text',                     defaultOn: false },
+  { id: 'brandColors', label: 'Brand palette', onLabel: 'Brand palette',   offLabel: 'Neutral palette',  onTag: 'brand colors dominant throughout scene',      offTag: 'neutral muted color palette', defaultOn: true  },
+  { id: 'person',      label: 'Person',        onLabel: 'With person',     offLabel: 'No people',        onTag: 'person in scene',                            offTag: 'no people in frame',          defaultOn: false },
+  { id: 'face',        label: 'Face',          onLabel: 'Face visible',    offLabel: 'Face hidden',      onTag: 'face clearly visible',                        offTag: 'no face visible, hands or back only', defaultOn: false },
+  { id: 'copySpace',   label: 'Copy space',    onLabel: 'Space for copy',  offLabel: null,               onTag: 'generous negative space for text overlay',    offTag: null,                          defaultOn: false },
+  { id: 'lifestyle',   label: 'Atmosphere',    onLabel: 'Lifestyle feel',  offLabel: 'Studio clean',     onTag: 'lifestyle atmosphere and context',            offTag: 'clean studio, minimal context', defaultOn: false },
+];
+
+function buildPromptWithMods(base: string, mods: Record<string, boolean>): string {
+  const p = base.replace(/, no text$/, '');
+  const tags: string[] = [];
+  for (const m of BRANDING_MODS) {
+    const isOn = mods[m.id];
+    const tag = isOn ? m.onTag : m.offTag;
+    if (tag) tags.push(tag);
+  }
+  return tags.length ? p + ', ' + tags.join(', ') : p;
+}
+
 const GALLERY_IMAGES = [
   'Pg48FMPgTI-rmB9PLU4gKg@2k.webp',
   '08DgRDZTTfelVI63jQ84Og@2k.webp',
@@ -774,8 +805,24 @@ function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail, debugDoc
 // ── Prompt section (inline, replaces gallery) ────────────────────────────────
 
 function PromptSection({ onSelect }: { onSelect: (p: string) => void }) {
+  const initMods = () => Object.fromEntries(BRANDING_MODS.map(m => [m.id, m.defaultOn]));
+  const [mods, setMods] = useState<Record<string, boolean>>(initMods);
+  const toggle = (id: string) => setMods(prev => ({ ...prev, [id]: !prev[id] }));
+
   return (
     <div style={{marginTop: 32, animation: 'fadeSlideUp 0.22s ease both'}}>
+      {/* Branding modifier strip */}
+      <div className="ps-mod-strip">
+        <span className="ps-mod-strip-label">Branding</span>
+        {BRANDING_MODS.map(m => (
+          <button key={m.id} className={`ps-mod-pill ${mods[m.id] ? 'on' : ''}`} onClick={() => toggle(m.id)}>
+            {mods[m.id] ? m.onLabel : (m.offLabel ?? m.onLabel)}
+          </button>
+        ))}
+        <button className="ps-mod-reset" onClick={() => setMods(initMods())}>Reset</button>
+      </div>
+
+      {/* Category groups */}
       {PRESET_CATEGORIES.map(cat => {
         const items = PROMPT_SUGGESTIONS.filter(s => s.category === cat);
         return (
@@ -787,8 +834,16 @@ function PromptSection({ onSelect }: { onSelect: (p: string) => void }) {
             </div>
             <div className="ps-grid">
               {items.map(s => (
-                <button key={s.id} className="ps-card" onClick={() => onSelect(s.prompt)}>
+                <button key={s.id} className="ps-card" onClick={() => onSelect(buildPromptWithMods(s.prompt, mods))}>
                   <p className="ps-text">{s.prompt}</p>
+                  <div className="ps-card-tags">
+                    {BRANDING_MODS.map(m => {
+                      const isOn = mods[m.id];
+                      const lbl = isOn ? m.onLabel : m.offLabel;
+                      if (!lbl) return null;
+                      return <span key={m.id} className={`ps-tag ${isOn ? 'on' : 'off'}`}>{lbl}</span>;
+                    })}
+                  </div>
                 </button>
               ))}
             </div>
