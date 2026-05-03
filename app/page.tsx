@@ -468,12 +468,20 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
   const [dragActive, setDragActive] = useState(false);
   const popRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const h = (e: MouseEvent) => { if (popRef.current && !popRef.current.contains(e.target as Node)) setPopOpen(false); };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
+
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 260) + 'px';
+  }, [value]);
 
   const addReferenceFiles = async (incoming: File[]) => {
     const imageFiles = incoming.filter(file => file.type.startsWith('image/'));
@@ -536,10 +544,11 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
         </div>
       )}
       <textarea
+        ref={taRef}
         placeholder="Describe an image — your Brand DNA will be applied automatically…"
         value={value} onChange={e=>setValue(e.target.value)} onKeyDown={handleKey}
         rows={1}
-        onInput={e=>{const t=e.target as HTMLTextAreaElement;t.style.height='auto';t.style.height=Math.min(t.scrollHeight,140)+'px';}}
+        onInput={e=>{const t=e.target as HTMLTextAreaElement;t.style.height='auto';t.style.height=Math.min(t.scrollHeight,260)+'px';}}
       />
       <div className="composer-tools">
         {/* Image attach */}
@@ -966,7 +975,7 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
         </button>
       </div>
       {showGallery
-        ? <PromptSection onSelect={p => { setPrompt(p); setShowGallery(false); }} onBack={() => setShowGallery(false)}/>
+        ? <PromptSection onSelect={p => setPrompt(p)} onBack={() => setShowGallery(false)}/>
         : <ExploreGallery/>
       }
     </div>
