@@ -78,6 +78,46 @@ OUTPUT STANDARD:
   • No visual glitches, warping, stitching artifacts, or repeated patterns
   • Composition follows rule of thirds or golden ratio; intentional, not accidental`;
 
+const CAMPAIGN_EXECUTION_GUIDE = `\
+━━━ CAMPAIGN EXECUTION GUIDE ━━━
+
+Classify the user's request into the closest campaign type and apply the matching constraints:
+
+PRODUCT SHOTS — highest reliability:
+  • Keep the product geometry clean, readable, and centered unless the user asks otherwise.
+  • For hero shots: simple background, realistic soft shadow, controlled studio lighting.
+  • For flat lays: top-down camera, tidy prop spacing, surface texture from prompt/reference.
+  • For variants: consistent scale, alignment, lighting, and palette across all products.
+  • Avoid random text. Render logo only when it belongs on the product/package/surface.
+
+CHARACTER + PRODUCT — medium difficulty:
+  • Prioritize natural hands, believable interaction, and product visibility.
+  • For full people: use candid lifestyle realism, not fashion-catalog stiffness.
+  • For hands close-ups: avoid face generation, keep hands anatomically plausible.
+  • Keep the product and logo legible; do not let the person overwhelm the product.
+
+APPAREL / WEARABLES — hardest:
+  • Preserve garment silhouette, fabric behavior, seams, scale, and fit.
+  • For on-model apparel: clean pose, full garment visible, no warped limbs or extra fingers.
+  • Prefer simpler compositions for reliability; flat lay is more reliable than on-model.
+  • For shoes/accessories: emphasize side angle, material texture, and product shape accuracy.
+
+SEASONAL / PROMO CAMPAIGNS:
+  • Use seasonal props and lighting as context, but preserve explicit Brand DNA first.
+  • Do not add sale text, slogans, prices, or dates unless the user explicitly requests text.
+  • Leave intentional negative space when prompt asks for banners, overlays, or text-safe areas.
+
+BRAND ATMOSPHERE / NO PRODUCT:
+  • If no product is needed, express the brand through palette, tone, lighting, texture, location,
+    typography feel, and art direction inferred from Brand DNA and references.
+  • Avoid inventing products or logos when the prompt asks only for mood, texture, or location.
+
+SOCIAL FORMAT SPECIFIC:
+  • Square post: strong central read, simple shapes, works at thumbnail size.
+  • Vertical 9:16: clear subject, top/bottom text-safe space, simple background hierarchy.
+  • Wide banner: horizontal composition, product or focal subject on one side, negative space
+    for headline, professional crop-safe framing.`;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // STEP 2 — Brand context block
 //
@@ -249,6 +289,7 @@ function buildFullPrompt(
   }
 
   sections.push(QUALITY_STANDARDS);
+  sections.push(CAMPAIGN_EXECUTION_GUIDE);
 
   sections.push(
     '━━━ GENERATION TASK ━━━\n' +

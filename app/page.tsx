@@ -132,34 +132,73 @@ const DEFAULT_BRANDS: Brand[] = [
 
 const PROMPT_SUGGESTIONS = [
   {
-    prompt: 'Product hero shot — clean product shot on a minimal background, studio lighting, centered composition, logo rendered accurately if visible, editorial campaign quality',
+    prompt: 'Clean product hero — studio product shot of [product], white background, soft shadow, professional lighting, no text, logo accurate if visible',
   },
   {
-    prompt: 'Lifestyle in-use scene — person naturally using the product in an everyday setting, warm natural lighting, candid feel, shallow depth of field, brand colors woven into the environment',
+    prompt: 'Lifestyle product flat lay — flat lay of [product] on [marble/wood/linen] surface, natural light, minimal props, brand colors [X, Y]',
   },
   {
-    prompt: 'Flat lay — top-down arrangement with the product surrounded by complementary props, soft even lighting, styled editorial look, brand palette used in surfaces and accents',
+    prompt: 'Product in environment — [product] placed on a cafe table, golden hour light, warm tones, lifestyle editorial feel',
   },
   {
-    prompt: 'Seasonal campaign — festive seasonal scene featuring the product, themed props and colors, cozy campaign atmosphere, brand identity preserved through palette and styling',
+    prompt: 'Multiple product variants — three [products] in a row, clean background, matching brand palette [colors], product photography',
   },
   {
-    prompt: 'Social story vertical ad — eye-catching vertical composition, bold colors, product prominently featured, text-safe space at top and bottom, social-first design',
+    prompt: 'Person holding product — lifestyle photo of a [young woman] holding [product], outdoor summer setting, candid, brand colors [X]',
   },
   {
-    prompt: 'Before and after comparison — split composition showing a transformation or comparison, clean dividing line, same lighting on both sides, clear informational style',
+    prompt: 'Person using product — person drinking from a [branded cup] at a coffee shop, warm atmosphere, shallow depth of field',
   },
   {
-    prompt: 'Ingredient or material close-up — macro study of raw ingredients or materials, rich textures, natural lighting, premium quality feel, brand colors subtly present',
+    prompt: 'Close-up hands with product — close-up of hands holding [product], minimal background, natural light, no full face, logo accurate if visible',
   },
   {
-    prompt: 'Unboxing and packaging — premium unboxing moment, product emerging from branded packaging, soft directional lighting, aspirational first-impression feel',
+    prompt: 'Group lifestyle shot — group of friends enjoying [product] at a picnic, sunny day, vibrant colors matching [brand palette]',
   },
   {
-    prompt: 'Team behind-the-scenes — authentic workspace scene with people collaborating, natural light, documentary style, subtle brand-colored accents',
+    prompt: 'Apparel on model — fashion model wearing [dress/top/item], studio lighting, clean background, full body shot, brand styling',
   },
   {
-    prompt: 'Banner wide hero — panoramic composition, product on one side with ample negative space for headline text, modern bold background using brand colors',
+    prompt: 'Apparel flat lay — clothing flat lay of [item] on white background, neatly arranged, editorial style, brand palette accents',
+  },
+  {
+    prompt: 'Accessory on model — model carrying [bag/jewelry/accessory] on a city street, candid editorial, brand colors [X, Y]',
+  },
+  {
+    prompt: 'Shoe hero shot — single sneaker or shoe on a clean concrete surface, side angle, dramatic lighting, no text',
+  },
+  {
+    prompt: 'Summer campaign — bright summer lifestyle image featuring [product], beach or outdoor setting, vibrant and energetic, brand colors [X]',
+  },
+  {
+    prompt: 'Back-to-school campaign — flat lay with [product], notebooks and pencils, fresh organized composition, color palette [X, Y]',
+  },
+  {
+    prompt: 'Holiday campaign — festive holiday scene with [product], warm lights, cozy atmosphere, brand colors [X] with gold accents',
+  },
+  {
+    prompt: 'Valentine campaign — romantic Valentine setup featuring [product], soft pink and red tones, candles, gift-ready styling',
+  },
+  {
+    prompt: 'Sale promo banner — bold promotional image for a summer sale featuring [product], energetic composition, brand colors [X, Y], no text',
+  },
+  {
+    prompt: 'Brand mood image — editorial lifestyle image matching brand aesthetic: [minimal/warm/urban/etc.], no product needed',
+  },
+  {
+    prompt: 'Location or storefront feel — cozy independent [cafe/boutique/studio] interior, warm lighting, inviting atmosphere, brand colors [X]',
+  },
+  {
+    prompt: 'Abstract brand texture — abstract background texture using brand colors [X, Y, Z], soft gradients, suitable for social media overlay',
+  },
+  {
+    prompt: 'Instagram square post — square format lifestyle image of [product], bold composition, brand colors [X], thumb-stopping visual',
+  },
+  {
+    prompt: 'Instagram Story vertical — vertical 9:16 lifestyle image of [product], bold and simple, top third empty for text overlay',
+  },
+  {
+    prompt: 'Facebook or LinkedIn banner — wide horizontal brand image, [product] featured, professional tone, brand colors [X, Y]',
   },
 ];
 
