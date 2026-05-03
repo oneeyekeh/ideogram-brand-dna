@@ -85,6 +85,7 @@ const paths: Record<string, React.ReactNode> = {
   chevL: <path d="m15 6-6 6 6 6"/>,
   chevD: <path d="m6 9 6 6 6-6"/>,
   x: <path d="M18 6 6 18M6 6l12 12"/>,
+  sliders: <><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></>,
   upload: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></>,
   download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></>,
   image: <><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></>,
@@ -410,7 +411,7 @@ function Sidebar({ page, setPage }: {
 
 function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset, setPreset,
   openCreateBrand, brands, attached, setAttached, compact = false }: {
-  value: string; setValue: (v: string) => void; onSend: () => void;
+  value: string; setValue: (v: string) => void; onSend: (prompt: string) => void;
   brand: Brand | null; setActiveBrand: (id: string | null) => void;
   activePreset: string | null; setPreset: (id: string | null) => void;
   openCreateBrand: () => void; brands: Brand[];
@@ -419,12 +420,22 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
 }) {
   const [popOpen, setPopOpen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mods, setMods] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(BRANDING_MODS.map(m => [m.id, m.defaultOn]))
+  );
   const popRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const settingsRef = useRef<HTMLDivElement>(null);
+  const toggleMod = (id: string) => setMods(prev => ({ ...prev, [id]: !prev[id] }));
+  const activeMods = BRANDING_MODS.filter(m => mods[m.id] !== m.defaultOn).length;
 
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (popRef.current && !popRef.current.contains(e.target as Node)) setPopOpen(false); };
+    const h = (e: MouseEvent) => {
+      if (popRef.current && !popRef.current.contains(e.target as Node)) setPopOpen(false);
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) setSettingsOpen(false);
+    };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
@@ -467,8 +478,14 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
     await addReferenceFiles(Array.from(e.dataTransfer.files ?? []));
   };
 
+  const handleSend = () => {
+    if (!value.trim() && attached.length === 0) return;
+    const base = value.trim() || 'Generate an on-brand image';
+    onSend(buildPromptWithMods(base, mods));
+  };
+
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
   return (
@@ -504,7 +521,7 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
         onInput={e=>{const t=e.target as HTMLTextAreaElement;t.style.height='auto';t.style.height=Math.min(t.scrollHeight,260)+'px';}}
       />
       <div className="composer-tools">
-        {/* Image attach */}
+        {/* References */}
         <button className="tool-pill" onClick={()=>fileRef.current?.click()} title="Attach up to 5 campaign reference images">
           <Icon name="paperclip" size={11}/> References {attached.length ? `${attached.length}/5` : ''}
         </button>
@@ -546,9 +563,36 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
           )}
         </div>
 
-        {!compact && <button className="tool-pill"><Icon name="ratio" size={11}/> 1:1</button>}
+        {/* Fake display pills */}
+        <span className="tool-pill-display"><Icon name="sparkle" size={10}/> 3.0</span>
+        <span className="tool-pill-display"><Icon name="image2" size={10}/> 2 · 1:1</span>
+
+        {/* More settings */}
+        <div style={{position:'relative'}} ref={settingsRef}>
+          <button className={`tool-pill ${settingsOpen || activeMods > 0 ? 'active' : ''}`}
+            onClick={() => setSettingsOpen(o => !o)} title="Branding settings">
+            <Icon name="sliders" size={11}/>
+            {activeMods > 0 && <span style={{fontSize:10}}>{activeMods}</span>}
+          </button>
+          {settingsOpen && (
+            <div className="composer-settings" style={compact ? {bottom:'calc(100% + 6px)'} : {bottom:'calc(100% + 6px)'}}>
+              <div className="cs-head">
+                <span>Branding modifiers</span>
+                <button className="cs-reset" onClick={() => setMods(Object.fromEntries(BRANDING_MODS.map(m => [m.id, m.defaultOn])))}>Reset</button>
+              </div>
+              <div className="cs-mods">
+                {BRANDING_MODS.map(m => (
+                  <button key={m.id} className={`cs-pill ${mods[m.id] ? 'on' : ''}`} onClick={() => toggleMod(m.id)}>
+                    {mods[m.id] ? m.onLabel : (m.offLabel ?? m.onLabel)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="spacer"/>
-        <button className="send-btn" onClick={onSend} disabled={!value.trim() && attached.length === 0}>
+        <button className="send-btn" onClick={handleSend} disabled={!value.trim() && attached.length === 0}>
           <Icon name="arrowU" size={14} stroke={2.2}/>
         </button>
       </div>
@@ -805,24 +849,8 @@ function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail, debugDoc
 // ── Prompt section (inline, replaces gallery) ────────────────────────────────
 
 function PromptSection({ onSelect }: { onSelect: (p: string) => void }) {
-  const initMods = () => Object.fromEntries(BRANDING_MODS.map(m => [m.id, m.defaultOn]));
-  const [mods, setMods] = useState<Record<string, boolean>>(initMods);
-  const toggle = (id: string) => setMods(prev => ({ ...prev, [id]: !prev[id] }));
-
   return (
     <div style={{marginTop: 32, animation: 'fadeSlideUp 0.22s ease both'}}>
-      {/* Branding modifier strip */}
-      <div className="ps-mod-strip">
-        <span className="ps-mod-strip-label">Branding</span>
-        {BRANDING_MODS.map(m => (
-          <button key={m.id} className={`ps-mod-pill ${mods[m.id] ? 'on' : ''}`} onClick={() => toggle(m.id)}>
-            {mods[m.id] ? m.onLabel : (m.offLabel ?? m.onLabel)}
-          </button>
-        ))}
-        <button className="ps-mod-reset" onClick={() => setMods(initMods())}>Reset</button>
-      </div>
-
-      {/* Category groups */}
       {PRESET_CATEGORIES.map(cat => {
         const items = PROMPT_SUGGESTIONS.filter(s => s.category === cat);
         return (
@@ -834,16 +862,8 @@ function PromptSection({ onSelect }: { onSelect: (p: string) => void }) {
             </div>
             <div className="ps-grid">
               {items.map(s => (
-                <button key={s.id} className="ps-card" onClick={() => onSelect(buildPromptWithMods(s.prompt, mods))}>
+                <button key={s.id} className="ps-card" onClick={() => onSelect(s.prompt)}>
                   <p className="ps-text">{s.prompt}</p>
-                  <div className="ps-card-tags">
-                    {BRANDING_MODS.map(m => {
-                      const isOn = mods[m.id];
-                      const lbl = isOn ? m.onLabel : m.offLabel;
-                      if (!lbl) return null;
-                      return <span key={m.id} className={`ps-tag ${isOn ? 'on' : 'off'}`}>{lbl}</span>;
-                    })}
-                  </div>
                 </button>
               ))}
             </div>
@@ -861,7 +881,7 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
   onOpenDetail, attached, setAttached, onReset, debugDoc, setDebugDoc }: {
   brand: Brand | null; brands: Brand[]; activeBrand: string | null;
   setActiveBrand: (id: string | null) => void;
-  prompt: string; setPrompt: (v: string) => void; onSend: () => void;
+  prompt: string; setPrompt: (v: string) => void; onSend: (prompt: string) => void;
   activePreset: string | null; setPreset: (id: string | null) => void;
   openCreateBrand: () => void;
   stream: StreamMessage[];
@@ -1482,9 +1502,9 @@ export default function App() {
     }
   }, [brands, activeBrand, activePreset]);
 
-  const send = useCallback(() => {
-    if (!prompt.trim() && attached.length === 0) return;
-    const userPrompt = prompt.trim() || 'Generate an on-brand image';
+  const send = useCallback((finalPrompt: string) => {
+    if (!finalPrompt.trim() && attached.length === 0) return;
+    const userPrompt = finalPrompt.trim() || 'Generate an on-brand image';
     const snap = attached.slice(0, 5);
     setPrompt('');
     setAttached([]);
@@ -1497,7 +1517,7 @@ export default function App() {
       setTimeout(() => generateImages(userPrompt, idx, snap), 0);
       return next;
     });
-  }, [prompt, attached, brand, generateImages]);
+  }, [attached, brand, generateImages]);
 
   const handleRegenerate = useCallback((msg: StreamMessage) => {
     if (!msg.prompt) return;
