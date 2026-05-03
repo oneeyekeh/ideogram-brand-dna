@@ -56,6 +56,7 @@ PHOTOREALISM:
     environment, fabric has micro-texture and weave detail, liquid has meniscus
   • No AI tells: no melting geometry, no hallucinated reflections, no extra limbs
   • Accurate product geometry: labels lie flat on curves, logos have correct perspective
+  • Text and logos must be crisp, readable, and intentionally placed when requested
   • Physically plausible lighting — shadows and highlights obey a single light source
 
 EXPOSURE & COLOR SCIENCE:
@@ -76,10 +77,12 @@ OUTPUT STANDARD:
 // hasLogo / refCount are passed so rules can reference what's actually attached.
 //
 // Priority hierarchy (enforced in text):
-//   1. Brand logo  → render faithfully when logo appears in scene
-//   2. Campaign references → generation-specific visual guidance
-//   3. Color palette → fallback for color decisions not covered by refs
-//   4. Voice & feel → emotional tone across all visual choices
+//   1. Explicit Brand DNA fields entered by the user
+//      (logo, palette, voice/tone, brand name) are the source of truth.
+//   2. Reference images fill in missing brand signals:
+//      typography style, formality, layout rhythm, visual tone, materials.
+//   3. User prompt decides the campaign task and which reference details matter.
+//   4. Quality standards raise the technical bar without overriding brand fidelity.
 // ─────────────────────────────────────────────────────────────────────────────
 function buildBrandContext(brand: BrandDNA, hasLogo: boolean, refCount: number): string {
   const lines: string[] = [
@@ -125,11 +128,24 @@ function buildBrandContext(brand: BrandDNA, hasLogo: boolean, refCount: number):
   lines.push('━━━ BRAND RULES — follow ALL without exception ━━━');
   lines.push('');
 
+  lines.push('PRIORITY ORDER:');
+  lines.push('  1. Explicit Brand DNA provided by the user comes first: logo, palette,');
+  lines.push('     brand name, and written voice/tone are authoritative.');
+  lines.push('  2. If Brand DNA is vague or incomplete, infer missing brand elements from');
+  lines.push('     the reference images: typography style, degree of formality, layout');
+  lines.push('     rhythm, camera language, graphic density, materials, tone, and mood.');
+  lines.push('  3. Use the user prompt to decide the scene and which reference details are relevant.');
+  lines.push('  4. Never let references contradict explicit Brand DNA unless the user asks.');
+  lines.push('');
+
   if (hasLogo) {
     lines.push('LOGO RENDERING:');
     lines.push('  • The attached logo image is the ground truth — reproduce it faithfully.');
     lines.push('  • When the scene includes a branded product, package, or surface,');
     lines.push('    render the logo on it with accurate colors, proportions, and details.');
+    lines.push('  • If the user asks for packaging, ads, banners, social posts, products,');
+    lines.push('    uniforms, storefronts, or branded surfaces, include the logo unless');
+    lines.push('    the user explicitly asks for an unbranded image.');
     lines.push('  • Do NOT simplify, distort, or reimagine the logo — match it exactly.');
     lines.push('  • The logo\'s own colors take precedence over the palette in the logo area.');
     lines.push('  • Logo placement should feel professionally applied — correct perspective,');
@@ -142,6 +158,12 @@ function buildBrandContext(brand: BrandDNA, hasLogo: boolean, refCount: number):
     lines.push('  • These images are user-provided campaign references for THIS generation.');
     lines.push('  • Use them according to the user prompt: preserve the relevant subject,');
     lines.push('    pose, product context, composition, lighting, or material cues as requested.');
+    lines.push('  • Study their brand DNA beyond objects: typography style, font weight,');
+    lines.push('    spacing, hierarchy, minimal vs. expressive layout, formal vs. playful');
+    lines.push('    tone, premium vs. casual mood, texture system, and graphic language.');
+    lines.push('  • If the written Brand DNA does not specify typography or tone clearly,');
+    lines.push('    infer those from the references and apply them consistently.');
+    lines.push('  • Do not copy irrelevant objects or accidental details from references.');
     lines.push('  • Blend the references with the active Brand DNA rather than replacing it.');
     lines.push('  • The final image must feel like a campaign asset for this brand, informed by');
     lines.push('    the supplied references and constrained by the brand palette, voice, and logo.');
@@ -151,8 +173,9 @@ function buildBrandContext(brand: BrandDNA, hasLogo: boolean, refCount: number):
   if (brand.palette.length) {
     lines.push('COLOR PALETTE (second priority after reference images):');
     lines.push(`  • Dominant palette: ${brand.palette.join(', ')}`);
-    lines.push('  • Apply these hex values to backgrounds, surfaces, props, and environment.');
-    lines.push('  • Do not introduce colors outside this palette unless physically unavoidable.');
+    lines.push('  • Treat these as brand color constraints, not loose inspiration.');
+    lines.push('  • Apply these hex values to backgrounds, surfaces, props, wardrobe, lighting gels, packaging, and environment.');
+    lines.push('  • Outside colors may appear only for natural skin, realistic materials, or physically unavoidable context.');
     lines.push('  • Color temperature and saturation must align with these swatches.');
     lines.push('');
   }
@@ -160,6 +183,7 @@ function buildBrandContext(brand: BrandDNA, hasLogo: boolean, refCount: number):
   if (brand.voice) {
     lines.push('BRAND VOICE & ATMOSPHERE:');
     lines.push(`  • The brand feels: "${brand.voice}"`);
+    lines.push('  • This written voice overrides any conflicting tone inferred from references.');
     lines.push('  • Let this permeate lighting mood, subject expression, texture, composition.');
     lines.push('  • A viewer should feel this brand\'s personality without reading any text.');
     lines.push('');
@@ -169,6 +193,8 @@ function buildBrandContext(brand: BrandDNA, hasLogo: boolean, refCount: number):
   lines.push('  • Do NOT add random text, watermarks, or unsolicited brand names.');
   lines.push('  • DO render the brand logo when it is part of the requested scene.');
   lines.push('  • Brand consistency overrides literal prompt interpretation.');
+  lines.push('  • If brand rules and references conflict, follow explicit user Brand DNA first,');
+  lines.push('    then use references to fill missing typography, tone, and style details.');
 
   return lines.join('\n');
 }
@@ -269,7 +295,10 @@ function buildApiParts(
         `Use this image as a generation-specific reference. Interpret it through the ` +
         `user prompt and the "${brand?.name ?? 'selected brand'}" Brand DNA: carry over ` +
         `the relevant subject, pose, product context, composition, lighting, textures, ` +
-        `or mood only where they help create the requested campaign image.`,
+        `or mood only where they help create the requested campaign image. Also infer ` +
+        `missing brand signals from it: typography style, layout hierarchy, formality, ` +
+        `visual tone, graphic density, material language, and art direction. Do not let ` +
+        `reference colors or tone override explicit Brand DNA unless the user asks.`,
     });
     parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
   });
@@ -289,7 +318,9 @@ function buildApiParts(
   }
   if (refs.length > 0) {
     reinforcement.push(
-      `REFERENCES: Use the ${refs.length} campaign reference image(s) according to the user prompt, while preserving Brand DNA.`
+      `REFERENCES: Use the ${refs.length} campaign reference image(s) according to the user prompt. ` +
+      `Preserve explicit Brand DNA first. Then use references to fill missing typography, tone, ` +
+      `layout, material, and art-direction details.`
     );
   }
   reinforcement.push(

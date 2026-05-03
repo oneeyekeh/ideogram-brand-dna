@@ -112,28 +112,54 @@ const DEFAULT_BRANDS: Brand[] = [
 
 const PROMPT_SUGGESTIONS = [
   {
-    prompt: 'Studio product hero shot — brand logo faithfully rendered on the product, soft directional lighting, pristine neutral background, tack-sharp focus on every material detail, commercial photography quality suitable for print campaigns',
+    prompt: 'Product hero shot — clean product shot on a minimal background, studio lighting, centered composition, logo rendered accurately if visible, editorial campaign quality',
   },
   {
-    prompt: 'Authentic lifestyle moment — person naturally holding or using the product in an aspirational real-world setting, golden-hour window light, shallow depth of field, candid expression, the brand\'s color palette woven into the environment',
+    prompt: 'Lifestyle in-use scene — person naturally using the product in an everyday setting, warm natural lighting, candid feel, shallow depth of field, brand colors woven into the environment',
   },
   {
-    prompt: 'Campaign hero image — bold cinematic wide composition, dramatic single-source lighting with deep intentional shadows, strong negative space on one side for headline copy, the brand identity is felt in every visual choice, magazine editorial quality',
+    prompt: 'Flat lay — top-down arrangement with the product surrounded by complementary props, soft even lighting, styled editorial look, brand palette used in surfaces and accents',
   },
   {
-    prompt: 'Social media content — product as the undeniable hero, vibrant use of brand palette in the background and props, graphic composition that reads instantly at thumbnail size, energetic and thumb-stopping, no clutter',
+    prompt: 'Seasonal campaign — festive seasonal scene featuring the product, themed props and colors, cozy campaign atmosphere, brand identity preserved through palette and styling',
   },
   {
-    prompt: 'Abstract brand mood — close-up macro study of textures and materials in the brand\'s exact color palette, no people or product, purely atmospheric, evokes the brand\'s emotional tone through surface, light, and material alone',
+    prompt: 'Social story vertical ad — eye-catching vertical composition, bold colors, product prominently featured, text-safe space at top and bottom, social-first design',
+  },
+  {
+    prompt: 'Before and after comparison — split composition showing a transformation or comparison, clean dividing line, same lighting on both sides, clear informational style',
+  },
+  {
+    prompt: 'Ingredient or material close-up — macro study of raw ingredients or materials, rich textures, natural lighting, premium quality feel, brand colors subtly present',
+  },
+  {
+    prompt: 'Unboxing and packaging — premium unboxing moment, product emerging from branded packaging, soft directional lighting, aspirational first-impression feel',
+  },
+  {
+    prompt: 'Team behind-the-scenes — authentic workspace scene with people collaborating, natural light, documentary style, subtle brand-colored accents',
+  },
+  {
+    prompt: 'Banner wide hero — panoramic composition, product on one side with ample negative space for headline text, modern bold background using brand colors',
   },
 ];
 
-// Placeholder gallery — 16 gradient tiles in a 4-col grid
-const GALLERY_GRADS = [
-  'grad-1','grad-7','grad-2','grad-11',
-  'grad-9','grad-4','grad-6','grad-13',
-  'grad-3','grad-12','grad-5','grad-8',
-  'grad-10','grad-2','grad-7','grad-1',
+const GALLERY_IMAGES = [
+  'Pg48FMPgTI-rmB9PLU4gKg@2k.webp',
+  '08DgRDZTTfelVI63jQ84Og@2k.webp',
+  'kM7cBDitTXeotDShQ8Ke4g@2k.webp',
+  '69ghV_qZS--imXfFajkfWA@2k.webp',
+  '7IbT6WXHRGmcWSjyZNHu0Q@2k.webp',
+  '1FZLuZZkQtev5AqXouKbDg@2k.webp',
+  '6OHyayxwRmOTtNB7g2EQMA@2k.webp',
+  'HOjVXOx2SxS1FapmLEK6HA@2k.webp',
+  'BLqzshvMQyyNEf96FetToA@2k.webp',
+  'KWwMri4MQA-z9BrmksPemw@2k.webp',
+  'o9L3elcnTdmKYXMeQF21zg@2k.webp',
+  'y98zCiIpRMG8ehisdg4uUQ@2k.webp',
+  'Uo1KvPSWRO2uiaJMaA4ygA@2k.webp',
+  'nh06s92-SGqj9yPGwj6Qhw@2k.webp',
+  '2KztG_IxT5iK97JvP-T9wA@2k.webp',
+  'DnACmo47QX6LnSLBMjIGMw@2k.webp',
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -237,7 +263,10 @@ function Sidebar({ page, setPage }: {
   );
   return (
     <aside className="sb">
-      <div className="sb-brand"><div className="sb-logo"/><div className="sb-name">ideogram</div></div>
+      <div className="sb-brand">
+        <img className="sb-logo" src="/ideogram-logo.png" alt="Ideogram" />
+        <div className="sb-name">ideogram</div>
+      </div>
       {item('explore','explore','Explore')}
       {item('batch','grid','Batch')}
       <div className="sb-section">Library</div>
@@ -271,6 +300,7 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
   compact?: boolean;
 }) {
   const [popOpen, setPopOpen] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const popRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -280,8 +310,9 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  const handleAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []).slice(0, Math.max(0, 5 - attached.length));
+  const addReferenceFiles = async (incoming: File[]) => {
+    const imageFiles = incoming.filter(file => file.type.startsWith('image/'));
+    const files = imageFiles.slice(0, Math.max(0, 5 - attached.length));
     if (!files.length) return;
     const refs = await Promise.all(files.map(async file => ({
       dataURL: await resizeImage(file, 512, 0.75),
@@ -289,7 +320,25 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
       name: file.name,
     })));
     setAttached(prev => [...prev, ...refs].slice(0, 5));
+  };
+
+  const handleAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    await addReferenceFiles(Array.from(e.target.files ?? []));
     e.target.value = '';
+  };
+
+  const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') setDragActive(true);
+    if (e.type === 'dragleave') setDragActive(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    await addReferenceFiles(Array.from(e.dataTransfer.files ?? []));
   };
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -297,7 +346,14 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
   };
 
   return (
-    <div className="composer">
+    <div
+      className={`composer ${compact ? 'compact' : ''} ${dragActive ? 'drag-active' : ''}`}
+      onDragEnter={handleDrag}
+      onDragOver={handleDrag}
+      onDragLeave={handleDrag}
+      onDrop={handleDrop}
+    >
+      {dragActive && <div className="composer-drop-hint">Drop images to add references</div>}
       {attached.length > 0 && (
         <div className="composer-refs">
           {attached.map((img, idx) => (
@@ -329,21 +385,22 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
 
         {/* Brand DNA picker */}
         <div style={{position:'relative'}} ref={popRef}>
-          <button className="tool-pill active" onClick={()=>setPopOpen(o=>!o)}>
+          <button className={`tool-pill ${brand ? 'active' : 'brand-empty'}`} onClick={()=>setPopOpen(o=>!o)}>
             {brand
               ? <><span className="swatch" style={{background:brand.palette[1]}}/>{brand.name.split(' ')[0]} DNA</>
-              : <><Icon name="dna" size={11}/> Brand DNA</>}
+              : <><Icon name="plus" size={11}/> Add Brand DNA</>}
             <Icon name="chevD" size={10}/>
           </button>
           {popOpen && (
-            <div className="brand-pop" style={{bottom:'calc(100% + 6px)',left:0}}>
-              <div className="brand-pop-h">Apply Brand DNA</div>
-              {/* No brand option */}
-              <div className={`brand-pop-row ${!brand?'active':''}`} onClick={()=>{setActiveBrand(null);setPopOpen(false);}}>
-                <span className="pop-pal" style={{background:'var(--bg-3)',borderRadius:4}}/>
-                <span className="nm" style={{color:'var(--text-3)'}}>No brand DNA</span>
-                {!brand && <Icon name="check" size={13}/>}
-              </div>
+            <div className="brand-pop" style={compact ? {bottom:'calc(100% + 6px)',left:0} : {top:'calc(100% + 6px)',left:0}}>
+              <button className="brand-pop-create" onClick={()=>{openCreateBrand();setPopOpen(false);}}>
+                <span className="create-icon"><Icon name="plus" size={13}/></span>
+                <span>
+                  <span className="create-title">Create new Brand DNA</span>
+                  <span className="create-sub">Upload logo, colors, and voice</span>
+                </span>
+              </button>
+              <div className="brand-pop-h">Popular Brand DNA</div>
               {brands.map(b=>(
                 <div key={b.id} className={`brand-pop-row ${brand?.id===b.id?'active':''}`}
                   onClick={()=>{setActiveBrand(b.id);setPopOpen(false);}}>
@@ -353,14 +410,16 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
                 </div>
               ))}
               <hr/>
-              <button className="brand-pop-add" onClick={()=>{openCreateBrand();setPopOpen(false);}}>
-                <Icon name="plus" size={12}/> Create new brand
-              </button>
+              <div className={`brand-pop-row ${!brand?'active':''}`} onClick={()=>{setActiveBrand(null);setPopOpen(false);}}>
+                <span className="pop-pal" style={{background:'var(--bg-3)',borderRadius:4}}/>
+                <span className="nm" style={{color:'var(--text-3)'}}>No Brand DNA</span>
+                {!brand && <Icon name="check" size={13}/>}
+              </div>
             </div>
           )}
         </div>
 
-        <button className="tool-pill"><Icon name="ratio" size={11}/> 1:1</button>
+        {!compact && <button className="tool-pill"><Icon name="ratio" size={11}/> 1:1</button>}
         <div className="spacer"/>
         <button className="send-btn" onClick={onSend} disabled={!value.trim() && attached.length === 0}>
           <Icon name="arrowU" size={14} stroke={2.2}/>
@@ -370,7 +429,7 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
   );
 }
 
-// ── Placeholder gallery ───────────────────────────────────────────────────────
+// ── Explore gallery ───────────────────────────────────────────────────────────
 
 function ExploreGallery() {
   return (
@@ -379,15 +438,14 @@ function ExploreGallery() {
         <h2>Explore <em>creations</em></h2>
         <button className="more">See more →</button>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
-        {GALLERY_GRADS.map((g,i)=>(
-          <div key={i} className={`${g}`} style={{
-            aspectRatio:'1/1',borderRadius:12,cursor:'pointer',
-            transition:'transform 0.18s',border:'1px solid var(--line)',
-          }}
-          onMouseEnter={e=>(e.currentTarget.style.transform='scale(1.02)')}
-          onMouseLeave={e=>(e.currentTarget.style.transform='scale(1)')}
-          />
+      <div className="explore-gallery-grid">
+        {GALLERY_IMAGES.map((name, i)=>(
+          <div key={name} className="gallery-image"
+            onMouseEnter={e=>(e.currentTarget.style.transform='scale(1.02)')}
+            onMouseLeave={e=>(e.currentTarget.style.transform='scale(1)')}
+          >
+            <img src={`/ideogram/${name}`} alt={`Explore creation ${i + 1}`} />
+          </div>
         ))}
       </div>
     </div>
@@ -578,9 +636,9 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
                 ) : null
               ) : (
                 <div key={i} className={`msg-asst ${m.variant ? `msg-asst-${m.variant}` : ''}`}>
-                  <div className="asst-head">
-                    <span className={`dot ${m.loading ? 'generating-dot' : ''}`}/>
-                    <span style={{fontSize:12,color:'var(--text-3)'}}>
+                  <div className={`asst-head ${m.error ? 'error' : ''}`}>
+                    {!m.error && <span className={`dot ${m.loading ? 'generating-dot' : ''}`}/>}
+                    <span>
                       {m.loading
                         ? <>{brand ? <><span style={{color:'var(--accent-text)',fontWeight:500}}>{brand.name}</span> DNA</> : 'Ideogram'} · Generating…</>
                         : m.error ? 'Error' : m.variant === 'regen' ? 'Regenerated' : m.variant === 'refine' ? 'Refined' : 'Ideogram'}
@@ -1099,7 +1157,6 @@ export default function App() {
         const next = [...prev];
         next[msgIdx] = {
           role: 'asst',
-          text: `Generated ${cappedImages.length} image${cappedImages.length!==1?'s':''}${currentBrand?` with ${currentBrand.name} DNA`:''}`,
           images: cappedImages,
           prompt: userPrompt,
           referenceImages: attachedRefs,
@@ -1183,8 +1240,6 @@ export default function App() {
     <div className="app">
       <Sidebar page={page} setPage={setPage}/>
       <div className="main">
-        <div className="top-strip"/>
-
         {page === 'explore' && (
           <ExplorePage
             brand={brand} brands={brands} activeBrand={activeBrand} setActiveBrand={setActiveBrand}
