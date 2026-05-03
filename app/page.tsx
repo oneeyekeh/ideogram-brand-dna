@@ -167,38 +167,50 @@ function resizeImage(file: File, maxPx = 512, quality = 0.75): Promise<string> {
   });
 }
 
-// Extract N dominant colors from a dataURL using canvas pixel sampling.
-// Quantizes to 32-step buckets to merge near-identical shades.
-function extractDominantColors(dataURL: string, count = 5): Promise<string[]> {
+// Extract vivid dominant colors from a dataURL.
+// Filters out grays and near-white/black. Weights vivid colors higher
+// so brand accent colors beat JPEG-artifact grays in the ranking.
+function extractDominantColors(dataURL: string, count = 10): Promise<string[]> {
   return new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
+      const size = 150;
       const canvas = document.createElement('canvas');
-      canvas.width = 60; canvas.height = 60;
-      canvas.getContext('2d')!.drawImage(img, 0, 0, 60, 60);
-      const d = canvas.getContext('2d')!.getImageData(0, 0, 60, 60).data;
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, size, size);
+      const d = ctx.getImageData(0, 0, size, size).data;
       const freq: Record<string, number> = {};
+
       for (let i = 0; i < d.length; i += 4) {
-        if (d[i + 3] < 128) continue; // skip transparent
-        const r = Math.round(d[i] / 32) * 32;
-        const g = Math.round(d[i + 1] / 32) * 32;
-        const b = Math.round(d[i + 2] / 32) * 32;
-        // Skip near-white and near-black (too common, not brand colors)
-        if (r > 230 && g > 230 && b > 230) continue;
-        if (r < 25 && g < 25 && b < 25) continue;
-        const k = `${r},${g},${b}`;
-        freq[k] = (freq[k] ?? 0) + 1;
+        const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
+        if (a < 128) continue;                         // transparent
+        if (r > 235 && g > 235 && b > 235) continue;  // near-white
+        if (r < 20  && g < 20  && b < 20)  continue;  // near-black
+
+        const cmax = Math.max(r, g, b);
+        const cmin = Math.min(r, g, b);
+        const sat = cmax - cmin;                        // 0=gray, 255=vivid
+        if (sat < 30) continue;                        // skip grays entirely
+
+        // Finer quantization for vivid colors so they don't merge
+        const step = sat > 80 ? 20 : 32;
+        const rq = Math.round(r / step) * step;
+        const gq = Math.round(g / step) * step;
+        const bq = Math.round(b / step) * step;
+        const k = `${rq},${gq},${bq}`;
+        // Weight by saturation: vivid colors count 2-4x more
+        freq[k] = (freq[k] ?? 0) + 1 + Math.floor(sat / 40);
       }
-      const colors = Object.entries(freq)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, count)
-        .map(([k]) => {
-          const [r, g, b] = k.split(',').map(Number);
-          return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
-        });
-      resolve(colors.length ? colors : ['#888888']);
+
+      const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+      const colors = sorted.slice(0, count).map(([k]) => {
+        const [r, g, b] = k.split(',').map(Number);
+        return '#' + [r, g, b].map(v => Math.min(255, v).toString(16).padStart(2, '0')).join('');
+      });
+      resolve(colors.length ? colors : []);
     };
-    img.onerror = () => resolve(['#888888']);
+    img.onerror = () => resolve([]);
     img.src = dataURL;
   });
 }
@@ -702,44 +714,36 @@ function BrandEditor({ brand: init, onBack, onSave }: {
 }) {
   const [name, setName] = useState(init?.name ?? '');
   const [voice, setVoice] = useState(init?.voice ?? '');
+  // candidates: all detected colors from images; palette: user-selected subset
+  const [candidates, setCandidates] = useState<string[]>([]);
   const [palette, setPalette] = useState<string[]>(init?.palette ?? []);
   const [logoImage, setLogoImage] = useState<string|undefined>(init?.logoImage);
   const [logoText, setLogoText] = useState(init?.logoText ?? '');
   const [refImages, setRefImages] = useState<ReferenceImage[]>(init?.referenceImages ?? []);
+  const [detecting, setDetecting] = useState(false);
   const logoRef = useRef<HTMLInputElement>(null);
   const refRef = useRef<HTMLInputElement>(null);
+  const customColorRef = useRef<HTMLInputElement>(null);
 
-  // Logo is the primary color source (up to 5 colors). Reference images only
-  // fill remaining slots (1-2 each) if the logo doesn't saturate the palette.
-  const refreshPalette = useCallback(async (logo: string | undefined, refs: ReferenceImage[]) => {
+  const refreshCandidates = useCallback(async (logo: string | undefined, refs: ReferenceImage[]) => {
+    setDetecting(true);
     const seen = new Set<string>();
-    const dedup = (cols: string[]) => cols.filter(c => { if (seen.has(c)) return false; seen.add(c); return true; });
-
+    const push = (cols: string[], out: string[]) => {
+      for (const c of cols) { if (!seen.has(c)) { seen.add(c); out.push(c); } }
+    };
     const all: string[] = [];
-
-    if (logo) {
-      const logoColors = await extractDominantColors(logo, 5);
-      all.push(...dedup(logoColors));
+    // Logo is primary — extract up to 10 vivid colors from it
+    if (logo) push(await extractDominantColors(logo, 10), all);
+    // Refs fill remaining slots (2 each)
+    for (const ref of refs.slice(0, 4)) {
+      if (all.length >= 14) break;
+      push(await extractDominantColors(ref.data, 3), all);
     }
-
-    // Only pull from refs if logo didn't fill the palette
-    if (all.length < 6) {
-      for (const ref of refs.slice(0, 4)) {
-        if (all.length >= 6) break;
-        const refColors = await extractDominantColors(ref.data, 2);
-        all.push(...dedup(refColors));
-      }
-    }
-
-    if (!all.length && refs.length) {
-      // No logo — fall back to refs as primary
-      for (const ref of refs.slice(0, 3)) {
-        const refColors = await extractDominantColors(ref.data, 2);
-        all.push(...dedup(refColors));
-      }
-    }
-
-    setPalette(all.slice(0, 6));
+    const final = all.slice(0, 14);
+    setCandidates(final);
+    // Auto-select top 5 if user hasn't curated yet
+    setPalette(prev => prev.length ? prev.filter(c => final.includes(c)) : final.slice(0, 5));
+    setDetecting(false);
   }, []);
 
   const handleLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -747,7 +751,7 @@ function BrandEditor({ brand: init, onBack, onSave }: {
     const d = await resizeImage(f, 800, 0.85);
     setLogoImage(d);
     if (!logoText) setLogoText(f.name.replace(/\.[^.]+$/, ''));
-    await refreshPalette(d, refImages);
+    await refreshCandidates(d, refImages);
   };
 
   const handleRefs = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -759,14 +763,23 @@ function BrandEditor({ brand: init, onBack, onSave }: {
     }
     const updated = [...refImages, ...newRefs];
     setRefImages(updated);
-    await refreshPalette(logoImage, updated);
+    await refreshCandidates(logoImage, updated);
     e.target.value = '';
   };
 
   const removeRef = async (id: string) => {
     const updated = refImages.filter(r => r.id !== id);
     setRefImages(updated);
-    await refreshPalette(logoImage, updated);
+    await refreshCandidates(logoImage, updated);
+  };
+
+  const toggleColor = (c: string) => {
+    setPalette(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+  };
+
+  const addCustomColor = (hex: string) => {
+    if (!palette.includes(hex)) setPalette(prev => [...prev, hex]);
+    if (!candidates.includes(hex)) setCandidates(prev => [...prev, hex]);
   };
 
   const save = () => {
@@ -780,15 +793,19 @@ function BrandEditor({ brand: init, onBack, onSave }: {
     });
   };
 
+  // Build preview gradient from palette
+  const previewGradient = palette.length >= 2
+    ? `linear-gradient(135deg, ${palette[0]} 0%, ${palette[1]} 60%, ${palette[2] ?? palette[0]} 100%)`
+    : palette.length === 1 ? palette[0] : undefined;
+
   return (
     <>
-      <div className="page-head">
-        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
+      <div className="page-head" style={{paddingBottom:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
           <button className="btn-bare" onClick={onBack}><Icon name="chevL" size={16}/></button>
           <span style={{fontSize:12,color:'var(--text-3)'}}>Brand DNA / {init ? 'Edit' : 'Create'}</span>
         </div>
-        <h1 className="page-h1">{init ? <>Edit <em>{init.name}</em></> : <>Define a new <em>Brand DNA</em></>}</h1>
-        <p className="page-sub">Save your brand identity once. Apply it to any prompt to keep generations on-brand.</p>
+        <h1 className="page-h1" style={{fontSize:24,marginBottom:4}}>{init ? <>Edit <em>{init.name}</em></> : <>New <em>Brand DNA</em></>}</h1>
       </div>
       <div className="page-content">
         <div className="editor">
@@ -797,82 +814,122 @@ function BrandEditor({ brand: init, onBack, onSave }: {
             {/* 1 — Brand basics */}
             <div className="section-block">
               <div className="section-h-form"><span className="section-num">1</span> Brand basics</div>
-              <div className="field">
-                <label className="field-label">Brand name</label>
-                <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Foundry Coffee"/>
+              <div style={{display:'flex',gap:10}}>
+                <div className="field" style={{flex:1,marginBottom:0}}>
+                  <label className="field-label">Brand name</label>
+                  <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Foundry Coffee"/>
+                </div>
               </div>
-              <div className="field" style={{marginBottom:0}}>
-                <label className="field-label">Voice &amp; feel <span style={{color:'var(--text-4)',fontWeight:400}}> — how does this brand feel?</span></label>
-                <textarea className="textarea" value={voice} onChange={e => setVoice(e.target.value)}
+              <div className="field" style={{marginBottom:0,marginTop:10}}>
+                <label className="field-label">Voice &amp; feel</label>
+                <textarea className="textarea" style={{minHeight:60}} value={voice} onChange={e => setVoice(e.target.value)}
                   placeholder="e.g. Earthy, slow, handcrafted — warm textures, muted tones, tactile."/>
               </div>
             </div>
 
-            {/* 2 — Logo */}
+            {/* 2 — Logo (compact horizontal) */}
             <div className="section-block">
               <div className="section-h-form"><span className="section-num">2</span> Logo</div>
-              <div className={`logo-drop ${logoImage ? 'has-file' : ''}`} onClick={() => logoRef.current?.click()}>
-                {logoImage
-                  ? <img src={logoImage} alt="Logo" style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',padding:8}}/>
-                  : <div style={{textAlign:'center'}}><Icon name="upload" size={18}/><div style={{marginTop:6}}>Click to upload logo</div><div style={{fontSize:10,marginTop:2,color:'var(--text-4)'}}>SVG, PNG, JPG</div></div>}
+              <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+                <div className={`logo-compact ${logoImage ? 'has-file' : ''}`} onClick={() => logoRef.current?.click()}>
+                  {logoImage
+                    ? <img src={logoImage} alt="Logo" style={{width:'100%',height:'100%',objectFit:'contain',padding:6}}/>
+                    : <div style={{textAlign:'center',color:'var(--text-3)'}}><Icon name="upload" size={16}/><div style={{fontSize:10,marginTop:3}}>Upload</div></div>}
+                </div>
+                <div style={{flex:1,display:'flex',flexDirection:'column',gap:6}}>
+                  <div style={{fontSize:12,color:'var(--text-2)',fontWeight:500}}>{logoImage ? 'Logo uploaded' : 'No logo yet'}</div>
+                  <div style={{fontSize:11,color:'var(--text-3)'}}>PNG, SVG, JPG — colors extracted automatically</div>
+                  {logoImage && (
+                    <div style={{display:'flex',gap:6}}>
+                      <input className="input" style={{flex:1,padding:'5px 9px',fontSize:11}} placeholder="Wordmark text"
+                        value={logoText} onChange={e => setLogoText(e.target.value)}/>
+                      <button className="btn-icon" onClick={async () => { setLogoImage(undefined); setLogoText(''); await refreshCandidates(undefined, refImages); }}>
+                        <Icon name="trash" size={12}/>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
               <input ref={logoRef} type="file" className="upload-input" accept="image/*" onChange={handleLogo}/>
-              {logoImage && (
-                <div style={{marginTop:8,display:'flex',gap:6}}>
-                  <input className="input" style={{flex:1,padding:'6px 10px',fontSize:12}} placeholder="Wordmark text"
-                    value={logoText} onChange={e => setLogoText(e.target.value)}/>
-                  <button className="btn-icon" onClick={async () => { setLogoImage(undefined); setLogoText(''); await refreshPalette(undefined, refImages); }}>
-                    <Icon name="trash" size={13}/>
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* 3 — Reference imagery */}
             <div className="section-block">
               <div className="section-h-form">
-                <span className="section-num">3</span> Reference imagery
+                <span className="section-num">3</span> Reference images
                 <span style={{marginLeft:'auto',fontSize:10,color:'var(--accent-text)',background:'var(--accent-soft)',padding:'2px 8px',borderRadius:100}}>Highest priority</span>
               </div>
-              <p style={{fontSize:12,color:'var(--text-3)',marginBottom:12}}>
-                Upload up to 5 example images. The model extracts their visual style for every generation.
-                Colors are auto-detected from your logo and references.
-              </p>
-              <div className="ref-grid">
+              <div className="ref-grid" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
                 {refImages.map(img => (
                   <div key={img.id} className="ref-tile" style={{position:'relative'}}>
                     <img src={img.data} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                     <button onClick={() => removeRef(img.id)}
-                      style={{position:'absolute',top:4,right:4,width:20,height:20,borderRadius:4,background:'rgba(0,0,0,0.6)',color:'white',display:'grid',placeItems:'center'}}>
-                      <Icon name="x" size={10}/>
+                      style={{position:'absolute',top:3,right:3,width:18,height:18,borderRadius:4,background:'rgba(0,0,0,0.7)',color:'white',display:'grid',placeItems:'center'}}>
+                      <Icon name="x" size={9}/>
                     </button>
                   </div>
                 ))}
                 {Array.from({length: Math.max(0, 5 - refImages.length)}).map((_, i) => (
                   <div key={`add-${i}`} className="ref-tile add" onClick={() => refRef.current?.click()}>
-                    <Icon name="plus" size={14}/>
+                    <Icon name="plus" size={13}/>
                   </div>
                 ))}
               </div>
               <input ref={refRef} type="file" className="upload-input" accept="image/*" multiple onChange={handleRefs}/>
             </div>
 
-            {/* Auto-detected palette (read-only) */}
-            {palette.length > 0 && (
-              <div className="section-block">
-                <div className="section-h-form"><span className="section-num">4</span> Detected color palette
-                  <span style={{marginLeft:'auto',fontSize:10,color:'var(--text-4)'}}>Auto-detected from your images</span>
+            {/* 4 — Color palette: toggleable candidates */}
+            <div className="section-block">
+              <div className="section-h-form">
+                <span className="section-num">4</span> Color palette
+                {detecting && <span style={{marginLeft:8,fontSize:10,color:'var(--text-3)'}}>Detecting…</span>}
+                <span style={{marginLeft:'auto',fontSize:10,color:'var(--text-4)'}}>Tap to select · {palette.length} chosen</span>
+              </div>
+
+              {candidates.length === 0 && !detecting && (
+                <p style={{fontSize:12,color:'var(--text-4)',margin:'4px 0 8px'}}>Upload a logo or reference images to auto-detect brand colors.</p>
+              )}
+
+              {/* Candidate swatches — tap to toggle */}
+              {candidates.length > 0 && (
+                <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}}>
+                  {candidates.map(c => {
+                    const selected = palette.includes(c);
+                    return (
+                      <button key={c} onClick={() => toggleColor(c)} title={c.toUpperCase()}
+                        style={{position:'relative',width:36,height:36,borderRadius:8,background:c,border:`2px solid ${selected ? '#fff' : 'transparent'}`,
+                          boxShadow: selected ? '0 0 0 2px var(--accent)' : '0 0 0 1px rgba(255,255,255,0.08)',
+                          cursor:'pointer',transition:'all 0.12s',flexShrink:0}}>
+                        {selected && (
+                          <span style={{position:'absolute',inset:0,display:'grid',placeItems:'center',color:'#fff',textShadow:'0 1px 3px rgba(0,0,0,0.7)'}}>
+                            <Icon name="check" size={12} stroke={2.5}/>
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                  {/* Custom color picker */}
+                  <button onClick={() => customColorRef.current?.click()} title="Add custom color"
+                    style={{width:36,height:36,borderRadius:8,border:'1.5px dashed var(--line-2)',background:'transparent',cursor:'pointer',display:'grid',placeItems:'center',color:'var(--text-3)',flexShrink:0,transition:'all 0.12s'}}
+                    onMouseEnter={e=>(e.currentTarget.style.borderColor='var(--accent)')}
+                    onMouseLeave={e=>(e.currentTarget.style.borderColor='var(--line-2)')}>
+                    <Icon name="plus" size={13}/>
+                  </button>
+                  <input ref={customColorRef} type="color" style={{opacity:0,width:0,height:0,position:'absolute'}}
+                    onChange={e => addCustomColor(e.target.value)}/>
                 </div>
-                <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:4}}>
-                  {palette.map((c, i) => (
-                    <div key={i} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
-                      <div style={{width:40,height:40,borderRadius:8,background:c,border:'1px solid var(--line)'}}/>
-                      <div style={{fontSize:10,color:'var(--text-3)',fontFamily:'monospace'}}>{c.toUpperCase()}</div>
-                    </div>
+              )}
+
+              {/* Selected palette preview row */}
+              {palette.length > 0 && (
+                <div style={{display:'flex',gap:5,alignItems:'center',padding:'8px 10px',background:'var(--bg-2)',borderRadius:8,border:'1px solid var(--line)'}}>
+                  <span style={{fontSize:10,color:'var(--text-4)',marginRight:4,whiteSpace:'nowrap'}}>Selected:</span>
+                  {palette.map(c => (
+                    <div key={c} style={{width:24,height:24,borderRadius:5,background:c,border:'1px solid rgba(255,255,255,0.1)',flexShrink:0}}/>
                   ))}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
               <button className="btn btn-ghost" onClick={onBack}>Cancel</button>
@@ -882,9 +939,10 @@ function BrandEditor({ brand: init, onBack, onSave }: {
 
           <aside className="editor-preview">
             <div className="preview-h">Live preview</div>
-            <div className={`preview-card ${init?.samples?.[0] ?? 'grad-1'}`}>
+            <div className={`preview-card ${!previewGradient ? (init?.samples?.[0] ?? 'grad-1') : ''}`}
+              style={previewGradient ? {background: previewGradient} : {}}>
               {logoImage
-                ? <img src={logoImage} alt="" style={{position:'absolute',bottom:12,left:14,height:40,objectFit:'contain',maxWidth:'60%'}}/>
+                ? <img src={logoImage} alt="" style={{position:'absolute',bottom:12,left:14,height:36,objectFit:'contain',maxWidth:'55%',filter:'drop-shadow(0 2px 8px rgba(0,0,0,0.35))'}}/>
                 : logoText ? <div className="corner-logo">{logoText}</div> : null}
             </div>
             {palette.length > 0 && (
@@ -904,7 +962,7 @@ function BrandEditor({ brand: init, onBack, onSave }: {
             <div className="preview-row">
               <span className="k">Colors</span>
               <span style={{color:palette.length>0?'#C7F25E':'var(--text-3)'}}>
-                {palette.length > 0 ? `${palette.length} detected` : 'Upload images'}
+                {palette.length > 0 ? `${palette.length} selected` : 'Upload images'}
               </span>
             </div>
           </aside>
