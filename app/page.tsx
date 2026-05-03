@@ -1515,16 +1515,17 @@ function sessionTitle(stream: StreamMessage[]) {
   return stream.find(m => m.role === 'asst' && m.prompt)?.prompt?.slice(0, 72) || 'Untitled session';
 }
 
-function SessionHistoryPage({ currentStream, currentFeedback, sessions, onOpenSession, onOpenCurrent }: {
+function SessionHistoryPage({ currentStream, currentFeedback, sessions, viewingSessionId, onOpenSession, onOpenCurrent }: {
   currentStream: StreamMessage[];
   currentFeedback: ImageFeedback;
   sessions: SessionRecord[];
+  viewingSessionId: string | null;
   onOpenSession: (session: SessionRecord) => void;
   onOpenCurrent: () => void;
 }) {
   const history = [
     ...(currentStream.length ? [{ id: 'current', title: sessionTitle(currentStream), createdAt: 'Current session', stream: currentStream, imageFeedback: currentFeedback }] : []),
-    ...sessions,
+    ...sessions.filter(s => s.id !== viewingSessionId),
   ];
 
   return (
@@ -1601,6 +1602,7 @@ export default function App() {
   const [editingBrand, setEditingBrand] = useState<Brand|null>(null);
 
   const [stream, setStream] = useState<StreamMessage[]>([]);
+  const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
   const [activePreset, setActivePreset] = useState<string|null>(null);
   const [detail, setDetail] = useState<DetailState|null>(null);
@@ -1621,6 +1623,8 @@ export default function App() {
   }, []);
 
   const archiveCurrentSession = useCallback(() => {
+    // Don't archive if we're viewing a historical session (no new work was done)
+    if (viewingSessionId) return;
     if (!stream.some(m => m.role === 'asst' && (m.images?.length || m.error || m.trace))) return;
     const record: SessionRecord = {
       id: `${Date.now()}`,
@@ -1630,7 +1634,7 @@ export default function App() {
       imageFeedback,
     };
     setSessions(prev => [record, ...prev].slice(0, 20));
-  }, [stream, imageFeedback, setSessions]);
+  }, [stream, imageFeedback, viewingSessionId, setSessions]);
 
   const generateImages = useCallback(async (
     userPrompt: string, msgIdx: number, attachedRefs: AttachedImage[]
@@ -1748,6 +1752,7 @@ export default function App() {
     const snap = attached.slice(0, 5);
     setPrompt('');
     setAttached([]);
+    setViewingSessionId(null); // user is now creating new work, detach from history
 
     setStream(prev => {
       const userMsg: StreamMessage = { role: 'user', text: userPrompt, attachedImages: snap.map(img => img.dataURL), referenceImages: snap };
@@ -1826,7 +1831,7 @@ export default function App() {
             imageFeedback={imageFeedback}
             onRateImage={rateImage}
             attached={attached} setAttached={setAttached}
-            onReset={() => { archiveCurrentSession(); setStream([]); setImageFeedback({}); setDebugDoc(null); }}
+            onReset={() => { archiveCurrentSession(); setStream([]); setImageFeedback({}); setDebugDoc(null); setViewingSessionId(null); }}
             debugDoc={debugDoc}
             setDebugDoc={setDebugDoc}
           />
@@ -1838,10 +1843,11 @@ export default function App() {
 
         {page === 'sessions' && (
           <SessionHistoryPage
-            currentStream={stream}
+            currentStream={viewingSessionId ? [] : stream}
             currentFeedback={imageFeedback}
             sessions={sessions}
-            onOpenSession={(session) => { setStream(session.stream); setImageFeedback(session.imageFeedback); setDebugDoc(null); setPage('explore'); }}
+            viewingSessionId={viewingSessionId}
+            onOpenSession={(session) => { setViewingSessionId(session.id); setStream(session.stream); setImageFeedback(session.imageFeedback); setDebugDoc(null); setPage('explore'); }}
             onOpenCurrent={() => setPage('explore')}
           />
         )}
