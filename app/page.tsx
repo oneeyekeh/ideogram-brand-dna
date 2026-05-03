@@ -167,6 +167,8 @@ interface BrandingMod {
   defaultOn: boolean;
 }
 
+type BrandingModState = Record<string, { enabled: boolean; value: boolean }>;
+
 const BRANDING_MODS: BrandingMod[] = [
   { id: 'logo',        label: 'Logo',          onLabel: 'Logo visible',    offLabel: 'No logo',          onTag: 'logo accurately rendered and visible',        offTag: 'no logo',                     defaultOn: false },
   { id: 'text',        label: 'Text',          onLabel: 'With text',       offLabel: 'No text',          onTag: 'brand name as text element in composition',   offTag: 'no text',                     defaultOn: false },
@@ -177,15 +179,23 @@ const BRANDING_MODS: BrandingMod[] = [
   { id: 'lifestyle',   label: 'Atmosphere',    onLabel: 'Lifestyle feel',  offLabel: 'Studio clean',     onTag: 'lifestyle atmosphere and context',            offTag: 'clean studio, minimal context', defaultOn: false },
 ];
 
-function buildPromptWithMods(base: string, mods: Record<string, boolean>): string {
-  const p = base.replace(/, no text$/, '');
+function getDefaultBrandingMods(): BrandingModState {
+  return Object.fromEntries(
+    BRANDING_MODS.map(m => [m.id, { enabled: false, value: m.defaultOn }])
+  ) as BrandingModState;
+}
+
+function buildPromptWithMods(base: string, mods: BrandingModState): string {
   const tags: string[] = [];
   for (const m of BRANDING_MODS) {
-    const isOn = mods[m.id];
-    const tag = isOn ? m.onTag : m.offTag;
+    const state = mods[m.id];
+    if (!state?.enabled) continue;
+    const tag = state.value ? m.onTag : m.offTag;
     if (tag) tags.push(tag);
   }
-  return tags.length ? p + ', ' + tags.join(', ') : p;
+  return tags.length
+    ? `${base}. Brand modifier guidance, apply only where compatible with the selected preset: ${tags.join('; ')}.`
+    : base;
 }
 
 const GALLERY_IMAGES = [
@@ -410,26 +420,23 @@ function Sidebar({ page, setPage }: {
 // ── Composer ──────────────────────────────────────────────────────────────────
 
 function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset, setPreset,
-  openCreateBrand, brands, attached, setAttached, compact = false }: {
+  openCreateBrand, brands, attached, setAttached, compact = false, hideBrandPicker = false }: {
   value: string; setValue: (v: string) => void; onSend: (prompt: string) => void;
   brand: Brand | null; setActiveBrand: (id: string | null) => void;
   activePreset: string | null; setPreset: (id: string | null) => void;
   openCreateBrand: () => void; brands: Brand[];
   attached: AttachedImage[]; setAttached: React.Dispatch<React.SetStateAction<AttachedImage[]>>;
-  compact?: boolean;
+  compact?: boolean; hideBrandPicker?: boolean;
 }) {
   const [popOpen, setPopOpen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [mods, setMods] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(BRANDING_MODS.map(m => [m.id, m.defaultOn]))
-  );
+  const [mods, setMods] = useState<BrandingModState>(getDefaultBrandingMods);
   const popRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
-  const toggleMod = (id: string) => setMods(prev => ({ ...prev, [id]: !prev[id] }));
-  const activeMods = BRANDING_MODS.filter(m => mods[m.id] !== m.defaultOn).length;
+  const activeMods = BRANDING_MODS.filter(m => mods[m.id]?.enabled).length;
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
@@ -528,7 +535,7 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
         <input ref={fileRef} type="file" className="upload-input" accept="image/*" multiple onChange={handleAttach}/>
 
         {/* Brand DNA picker */}
-        <div style={{position:'relative'}} ref={popRef}>
+        {!hideBrandPicker && <div style={{position:'relative'}} ref={popRef}>
           <button className={`tool-pill ${brand ? 'active' : 'brand-empty'}`} onClick={()=>setPopOpen(o=>!o)}>
             {brand
               ? <><span className="swatch" style={{background:brand.palette[1]}}/>{brand.name.split(' ')[0]} DNA</>
@@ -561,12 +568,14 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Fake display pills */}
-        <span className="tool-pill-display"><Icon name="sparkle" size={10}/> 3.0</span>
-        <span className="tool-pill-display"><Icon name="image2" size={10}/> 2</span>
-        <span className="tool-pill-display"><Icon name="ratio" size={10}/> 1:1</span>
+        {!compact && <>
+          <span className="tool-pill-display"><Icon name="sparkle" size={10}/> 3.0</span>
+          <span className="tool-pill-display"><Icon name="image2" size={10}/> 2</span>
+          <span className="tool-pill-display"><Icon name="ratio" size={10}/> 1:1</span>
+        </>}
 
         {/* More settings */}
         <div style={{position:'relative'}} ref={settingsRef}>
@@ -579,23 +588,39 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
             <div className="composer-settings">
               <div className="cs-head">
                 <span>Branding settings</span>
-                <button className="cs-reset" onClick={() => setMods(Object.fromEntries(BRANDING_MODS.map(m => [m.id, m.defaultOn])))}>Reset</button>
+                <button className="cs-reset" onClick={() => setMods(getDefaultBrandingMods())}>Reset</button>
               </div>
-              {BRANDING_MODS.map(m => (
-                <div key={m.id} className="cs-row">
-                  <span className="cs-row-label">{m.label}</span>
-                  <div className="cs-row-btns">
-                    <button className={`cs-opt ${mods[m.id] ? 'active' : ''}`}
-                      onClick={() => setMods(p => ({...p, [m.id]: true}))}>
-                      {m.onLabel}
-                    </button>
-                    <button className={`cs-opt ${!mods[m.id] ? 'active' : ''}`}
-                      onClick={() => setMods(p => ({...p, [m.id]: false}))}>
-                      {m.offLabel ?? 'Off'}
-                    </button>
+              {BRANDING_MODS.map(m => {
+                const state = mods[m.id] ?? { enabled: false, value: m.defaultOn };
+                return (
+                  <div key={m.id} className={`cs-row ${state.enabled ? 'enabled' : ''}`}>
+                    <div className="cs-row-main">
+                      <span className="cs-row-label">{m.label}</span>
+                      <button
+                        className={`cs-enable ${state.enabled ? 'active' : ''}`}
+                        onClick={() => setMods(p => ({
+                          ...p,
+                          [m.id]: { ...(p[m.id] ?? { value: m.defaultOn }), enabled: !(p[m.id]?.enabled ?? false) },
+                        }))}
+                      >
+                        {state.enabled ? 'Applied' : 'Apply'}
+                      </button>
+                    </div>
+                    <div className={`cs-row-btns ${state.enabled ? '' : 'disabled'}`}>
+                      <button className={`cs-opt ${state.value ? 'active' : ''}`}
+                        disabled={!state.enabled}
+                        onClick={() => setMods(p => ({...p, [m.id]: { enabled: true, value: true }}))}>
+                        {m.onLabel}
+                      </button>
+                      <button className={`cs-opt ${!state.value ? 'active' : ''}`}
+                        disabled={!state.enabled}
+                        onClick={() => setMods(p => ({...p, [m.id]: { enabled: true, value: false }}))}>
+                        {m.offLabel ?? 'Off'}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -935,10 +960,23 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
             ))}
           </div>
           <div className="composer-foot">
+            <div className="composer-brand-strip">
+              {brand ? (
+                <div className="composer-brand-chip">
+                  <span className="pop-pal">{brand.palette.slice(0,4).map((c,i)=><span key={i} style={{background:c}}/>)}</span>
+                  <span>{brand.name} DNA</span>
+                </div>
+              ) : (
+                <button className="composer-brand-chip empty" onClick={openCreateBrand}>
+                  <Icon name="plus" size={11}/>
+                  <span>Add Brand DNA</span>
+                </button>
+              )}
+            </div>
             <Composer value={prompt} setValue={setPrompt} onSend={onSend}
               brand={brand} setActiveBrand={setActiveBrand} brands={brands}
               activePreset={activePreset} setPreset={setPreset}
-              openCreateBrand={openCreateBrand} attached={attached} setAttached={setAttached} compact/>
+              openCreateBrand={openCreateBrand} attached={attached} setAttached={setAttached} compact hideBrandPicker/>
           </div>
         </div>
 
