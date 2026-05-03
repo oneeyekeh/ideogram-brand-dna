@@ -532,7 +532,6 @@ function ExploreGallery() {
     <div style={{marginTop:32}}>
       <div className="sec-head" style={{marginTop:0,marginBottom:14}}>
         <h2>Explore <em>creations</em></h2>
-        <button className="more">See more →</button>
       </div>
       <div className="explore-gallery-grid">
         {GALLERY_IMAGES.map((name, i)=>(
