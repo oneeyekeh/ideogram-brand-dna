@@ -523,7 +523,7 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
       <div className="composer-tools">
         {/* References */}
         <button className="tool-pill" onClick={()=>fileRef.current?.click()} title="Attach up to 5 campaign reference images">
-          <Icon name="paperclip" size={11}/> References {attached.length ? `${attached.length}/5` : ''}
+          <Icon name="paperclip" size={12}/>{attached.length > 0 && <span className="tool-pill-badge">{attached.length}</span>}
         </button>
         <input ref={fileRef} type="file" className="upload-input" accept="image/*" multiple onChange={handleAttach}/>
 
@@ -565,28 +565,37 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
 
         {/* Fake display pills */}
         <span className="tool-pill-display"><Icon name="sparkle" size={10}/> 3.0</span>
-        <span className="tool-pill-display"><Icon name="image2" size={10}/> 2 · 1:1</span>
+        <span className="tool-pill-display"><Icon name="image2" size={10}/> 2</span>
+        <span className="tool-pill-display"><Icon name="ratio" size={10}/> 1:1</span>
 
         {/* More settings */}
         <div style={{position:'relative'}} ref={settingsRef}>
           <button className={`tool-pill ${settingsOpen || activeMods > 0 ? 'active' : ''}`}
             onClick={() => setSettingsOpen(o => !o)} title="Branding settings">
             <Icon name="sliders" size={11}/>
-            {activeMods > 0 && <span style={{fontSize:10}}>{activeMods}</span>}
+            {activeMods > 0 && <span className="tool-pill-badge">{activeMods}</span>}
           </button>
           {settingsOpen && (
-            <div className="composer-settings" style={compact ? {bottom:'calc(100% + 6px)'} : {bottom:'calc(100% + 6px)'}}>
+            <div className="composer-settings">
               <div className="cs-head">
-                <span>Branding modifiers</span>
+                <span>Branding settings</span>
                 <button className="cs-reset" onClick={() => setMods(Object.fromEntries(BRANDING_MODS.map(m => [m.id, m.defaultOn])))}>Reset</button>
               </div>
-              <div className="cs-mods">
-                {BRANDING_MODS.map(m => (
-                  <button key={m.id} className={`cs-pill ${mods[m.id] ? 'on' : ''}`} onClick={() => toggleMod(m.id)}>
-                    {mods[m.id] ? m.onLabel : (m.offLabel ?? m.onLabel)}
-                  </button>
-                ))}
-              </div>
+              {BRANDING_MODS.map(m => (
+                <div key={m.id} className="cs-row">
+                  <span className="cs-row-label">{m.label}</span>
+                  <div className="cs-row-btns">
+                    <button className={`cs-opt ${mods[m.id] ? 'active' : ''}`}
+                      onClick={() => setMods(p => ({...p, [m.id]: true}))}>
+                      {m.onLabel}
+                    </button>
+                    <button className={`cs-opt ${!mods[m.id] ? 'active' : ''}`}
+                      onClick={() => setMods(p => ({...p, [m.id]: false}))}>
+                      {m.offLabel ?? 'Off'}
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -70,14 +70,15 @@ input, textarea { font: inherit; color: inherit; background: none; border: none;
 .composer textarea::placeholder { color: var(--text-3); }
 .composer-tools { display: flex; align-items: center; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
 .composer.compact .composer-tools { flex-wrap: nowrap; }
-.tool-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; background: transparent; border: 1px solid var(--line-2); border-radius: 100px; font-size: 12px; color: var(--text-2); transition: all 0.12s; }
-.tool-pill-display { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 100px; font-size: 12px; color: var(--text-4); pointer-events: none; user-select: none; }
-.composer.compact .tool-pill { min-width: 0; padding: 5px 8px; font-size: 11.5px; white-space: nowrap; }
+.tool-pill { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; background: var(--bg-2); border: none; border-radius: 100px; font-size: 12.5px; color: var(--text-2); transition: all 0.12s; }
+.tool-pill-display { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; background: var(--bg-2); border: none; border-radius: 100px; font-size: 12.5px; color: var(--text-3); pointer-events: none; user-select: none; }
+.composer.compact .tool-pill { padding: 5px 9px; font-size: 12px; }
 .tool-pill:hover { background: var(--bg-3); color: var(--text-1); }
-.tool-pill.active { background: var(--accent-soft); border-color: rgba(124,92,255,0.3); color: var(--accent-text); }
-.tool-pill.brand-empty { background: transparent; border-color: var(--line-2); color: var(--text-2); }
-.tool-pill.brand-empty:hover { border-color: var(--accent); color: var(--text-1); background: var(--bg-3); }
-.tool-pill .swatch { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.1); }
+.tool-pill.active { background: var(--accent); color: white; }
+.tool-pill.brand-empty { background: var(--bg-2); color: var(--text-2); }
+.tool-pill.brand-empty:hover { background: var(--bg-3); color: var(--text-1); }
+.tool-pill .swatch { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+.tool-pill-badge { font-size: 10px; font-weight: 600; background: rgba(255,255,255,0.15); border-radius: 100px; padding: 1px 5px; line-height: 1.4; }
 .composer .spacer { flex: 1; }
 .composer-side { display: inline-flex; align-items: center; gap: 10px; font-size: 11.5px; color: var(--text-3); }
 .send-btn { width: 30px; height: 30px; border-radius: 50%; background: var(--text-1); color: var(--bg-0); display: grid; place-items: center; transition: all 0.15s; }
@@ -97,15 +98,18 @@ input, textarea { font: inherit; color: inherit; background: none; border: none;
 .prompt-chip-more:hover { color: var(--text-1); border-color: var(--accent); background: var(--accent-soft); border-style: dashed; }
 
 /* Composer settings panel */
-.composer-settings { position: absolute; bottom: calc(100% + 6px); right: 0; background: #1C1C20; border: 1px solid var(--line-2); border-radius: 14px; padding: 12px 14px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); width: 300px; z-index: 30; }
-.cs-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.cs-head span { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); font-weight: 600; }
-.cs-reset { font-size: 11px; color: var(--text-4); padding: 2px 7px; border-radius: 5px; }
-.cs-reset:hover { color: var(--text-2); background: var(--bg-2); }
-.cs-mods { display: flex; flex-wrap: wrap; gap: 5px; }
-.cs-pill { display: inline-flex; align-items: center; padding: 5px 11px; border-radius: 100px; font-size: 12px; border: 1px solid var(--line); color: var(--text-3); transition: all 0.12s; white-space: nowrap; }
-.cs-pill:hover { color: var(--text-1); border-color: var(--line-2); background: var(--bg-2); }
-.cs-pill.on { background: var(--accent-soft); border-color: rgba(124,92,255,0.3); color: var(--accent-text); }
+.composer-settings { position: absolute; bottom: calc(100% + 8px); right: 0; background: #1E1E22; border: 1px solid var(--line-2); border-radius: 16px; overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,0.6); width: 320px; z-index: 30; }
+.cs-head { display: flex; align-items: center; justify-content: space-between; padding: 11px 16px 10px; border-bottom: 1px solid var(--line); }
+.cs-head span { font-size: 12px; color: var(--text-2); font-weight: 500; }
+.cs-reset { font-size: 11.5px; color: var(--text-4); padding: 3px 8px; border-radius: 6px; }
+.cs-reset:hover { color: var(--text-2); background: var(--bg-3); }
+.cs-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 16px; border-bottom: 1px solid var(--line); }
+.cs-row:last-child { border-bottom: none; }
+.cs-row-label { font-size: 13px; color: var(--text-2); }
+.cs-row-btns { display: flex; background: var(--bg-3); border-radius: 8px; padding: 2px; gap: 1px; }
+.cs-opt { padding: 4px 10px; border-radius: 6px; font-size: 12px; color: var(--text-3); transition: all 0.12s; white-space: nowrap; }
+.cs-opt:hover { color: var(--text-2); }
+.cs-opt.active { background: var(--bg-1); color: var(--text-1); box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
 
 /* Prompt section — inline flip of explore gallery */
 
