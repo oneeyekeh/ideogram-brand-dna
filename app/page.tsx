@@ -46,7 +46,12 @@ interface DetailState {
   brand?: Brand;
 }
 
-type Reaction = 'like' | 'dislike' | null;
+interface RefineState {
+  q1: string[];   // main issues
+  q2: string[];   // what to change
+  q3: string[];   // priority element
+  q4: string;     // free text
+}
 
 // ── SVG Icon ──────────────────────────────────────────────────────────────────
 
@@ -104,13 +109,13 @@ const DEFAULT_BRANDS: Brand[] = [
 ];
 
 const PRESETS = [
-  { id: 'general', name: 'General' },
-  { id: 'editorial', name: 'Editorial', cover: 'grad-1' },
-  { id: 'product', name: 'Product', cover: 'grad-11' },
-  { id: 'lifestyle', name: 'Lifestyle', cover: 'grad-2' },
-  { id: 'social', name: 'Social post', cover: 'grad-9' },
-  { id: 'banner', name: 'Web banner', cover: 'grad-7' },
-  { id: 'package', name: 'Packaging', cover: 'grad-12' },
+  { id: 'general',   name: 'General' },
+  { id: 'editorial', name: 'Editorial' },
+  { id: 'product',   name: 'Product' },
+  { id: 'lifestyle', name: 'Lifestyle' },
+  { id: 'social',    name: 'Social post' },
+  { id: 'banner',    name: 'Web banner' },
+  { id: 'package',   name: 'Packaging' },
 ];
 
 // Placeholder gallery — 16 gradient tiles in a 4-col grid
@@ -143,6 +148,42 @@ function resizeImage(file: File, maxPx = 512, quality = 0.75): Promise<string> {
     };
     img.onerror = reject;
     img.src = objectUrl;
+  });
+}
+
+// Extract N dominant colors from a dataURL using canvas pixel sampling.
+// Quantizes to 32-step buckets to merge near-identical shades.
+function extractDominantColors(dataURL: string, count = 5): Promise<string[]> {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 60; canvas.height = 60;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, 60, 60);
+      const d = canvas.getContext('2d')!.getImageData(0, 0, 60, 60).data;
+      const freq: Record<string, number> = {};
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 128) continue; // skip transparent
+        const r = Math.round(d[i] / 32) * 32;
+        const g = Math.round(d[i + 1] / 32) * 32;
+        const b = Math.round(d[i + 2] / 32) * 32;
+        // Skip near-white and near-black (too common, not brand colors)
+        if (r > 230 && g > 230 && b > 230) continue;
+        if (r < 25 && g < 25 && b < 25) continue;
+        const k = `${r},${g},${b}`;
+        freq[k] = (freq[k] ?? 0) + 1;
+      }
+      const colors = Object.entries(freq)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, count)
+        .map(([k]) => {
+          const [r, g, b] = k.split(',').map(Number);
+          return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+        });
+      resolve(colors.length ? colors : ['#888888']);
+    };
+    img.onerror = () => resolve(['#888888']);
+    img.src = dataURL;
   });
 }
 
@@ -335,48 +376,89 @@ function ExploreGallery() {
   );
 }
 
-// ── Like/Dislike ──────────────────────────────────────────────────────────────
+// ── Refine questionnaire ──────────────────────────────────────────────────────
 
-function ReactionBar({ id, reactions, setReaction }: {
-  id: string; reactions: Record<string, Reaction>;
-  setReaction: (id: string, r: Reaction) => void;
+const REFINE_Q1 = ['Colors off brand','Lighting / mood','Logo not accurate','Composition','Style mismatch','Quality issues'];
+const REFINE_Q2 = ['More contrast','Darker','Brighter','Warmer tones','Cooler tones','Different angle','Tighter framing','More minimal','More dramatic'];
+const REFINE_Q3 = ['Background','Main subject','Logo / branding','Color grading','Atmosphere & mood','Textures & materials'];
+
+function RefineForm({ onSubmit, onCancel }: {
+  onSubmit: (state: RefineState) => void;
+  onCancel: () => void;
 }) {
-  const current = reactions[id] ?? null;
-  const toggle = (r: 'like' | 'dislike') => setReaction(id, current === r ? null : r);
+  const [q1, setQ1] = useState<string[]>([]);
+  const [q2, setQ2] = useState<string[]>([]);
+  const [q3, setQ3] = useState<string[]>([]);
+  const [q4, setQ4] = useState('');
+
+  const toggle = (arr: string[], val: string, set: (v: string[]) => void) =>
+    set(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
+
+  const chips = (opts: string[], sel: string[], set: (v: string[]) => void) => (
+    <div style={{display:'flex',flexWrap:'wrap',gap:5,marginTop:6}}>
+      {opts.map(o => (
+        <button key={o} onClick={() => toggle(sel, o, set)}
+          style={{padding:'3px 10px',borderRadius:100,fontSize:11,border:'1px solid',cursor:'pointer',transition:'all 0.12s',
+            borderColor: sel.includes(o) ? 'var(--accent)' : 'var(--line)',
+            background: sel.includes(o) ? 'var(--accent-soft)' : 'transparent',
+            color: sel.includes(o) ? 'var(--accent-text)' : 'var(--text-2)'}}>
+          {o}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
-    <div style={{display:'flex',gap:4,justifyContent:'center',paddingTop:6}}>
-      <button
-        onClick={()=>toggle('like')}
-        style={{display:'inline-flex',alignItems:'center',gap:4,padding:'3px 8px',borderRadius:100,border:'1px solid',fontSize:11,
-          borderColor: current==='like'?'var(--accent)':'var(--line)',
-          background: current==='like'?'var(--accent-soft)':'transparent',
-          color: current==='like'?'var(--accent-text)':'var(--text-3)',
-          transition:'all 0.12s',cursor:'pointer'}}>
-        <Icon name="thumbUp" size={11} stroke={current==='like'?2:1.6}/>
-      </button>
-      <button
-        onClick={()=>toggle('dislike')}
-        style={{display:'inline-flex',alignItems:'center',gap:4,padding:'3px 8px',borderRadius:100,border:'1px solid',fontSize:11,
-          borderColor: current==='dislike'?'#FF5C28':'var(--line)',
-          background: current==='dislike'?'rgba(255,92,40,0.12)':'transparent',
-          color: current==='dislike'?'#FF8055':'var(--text-3)',
-          transition:'all 0.12s',cursor:'pointer'}}>
-        <Icon name="thumbDown" size={11} stroke={current==='dislike'?2:1.6}/>
-      </button>
+    <div style={{marginTop:10,padding:'14px 16px',background:'var(--bg-1)',border:'1px solid var(--line)',borderRadius:12,display:'flex',flexDirection:'column',gap:12}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <span style={{fontSize:12,fontWeight:600,color:'var(--text-1)'}}>Refine this generation</span>
+        <button onClick={onCancel} style={{color:'var(--text-3)',display:'flex'}}><Icon name="x" size={12}/></button>
+      </div>
+
+      <div>
+        <div style={{fontSize:11,color:'var(--text-3)',fontWeight:500}}>What's the main issue?</div>
+        {chips(REFINE_Q1, q1, setQ1)}
+      </div>
+      <div>
+        <div style={{fontSize:11,color:'var(--text-3)',fontWeight:500}}>What should change?</div>
+        {chips(REFINE_Q2, q2, setQ2)}
+      </div>
+      <div>
+        <div style={{fontSize:11,color:'var(--text-3)',fontWeight:500}}>Which element needs the most work?</div>
+        {chips(REFINE_Q3, q3, setQ3)}
+      </div>
+      <div>
+        <div style={{fontSize:11,color:'var(--text-3)',fontWeight:500,marginBottom:5}}>Any other direction? <span style={{fontWeight:400}}>(optional)</span></div>
+        <textarea value={q4} onChange={e=>setQ4(e.target.value)}
+          placeholder="e.g. warmer tones, tighter crop, logo should be more prominent…"
+          style={{width:'100%',background:'var(--bg-2)',border:'1px solid var(--line)',borderRadius:8,padding:'7px 10px',fontSize:11,color:'var(--text-1)',resize:'none',lineHeight:1.5,boxSizing:'border-box'}}
+          rows={2}/>
+      </div>
+      <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
+        <button className="btn btn-ghost" style={{fontSize:11,padding:'5px 12px'}} onClick={onCancel}>Cancel</button>
+        <button className="btn btn-primary" style={{fontSize:11,padding:'5px 14px'}}
+          onClick={() => onSubmit({ q1, q2, q3, q4 })}
+          disabled={!q1.length && !q2.length && !q3.length && !q4.trim()}>
+          Generate refined version →
+        </button>
+      </div>
     </div>
   );
 }
 
 // ── Explore active — right results panel ──────────────────────────────────────
 
-function ExploreResults({ stream, reactions, setReaction, onRegenerate, onOpenDetail, brand }: {
-  stream: StreamMessage[]; reactions: Record<string, Reaction>;
-  setReaction: (id: string, r: Reaction) => void;
+function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail }: {
+  stream: StreamMessage[];
   onRegenerate: (msg: StreamMessage, idx: number) => void;
+  onRefine: (msg: StreamMessage, idx: number, refineState: RefineState) => void;
   onOpenDetail: (msg: StreamMessage, imgIdx: number) => void;
   brand: Brand | null;
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
+  // Track which block is in "refine mode" — keyed by stream index
+  const [refining, setRefining] = useState<number | null>(null);
+
   useEffect(() => {
     if (canvasRef.current) canvasRef.current.scrollTop = canvasRef.current.scrollHeight;
   }, [stream]);
@@ -406,28 +488,29 @@ function ExploreResults({ stream, reactions, setReaction, onRegenerate, onOpenDe
               : m.error
                 ? <div className="tile tile-error"><Icon name="image" size={20}/><span>{m.error}</span></div>
                 : (m.images ?? []).slice(0,2).map((src,j)=>(
-                    <div key={j} style={{display:'flex',flexDirection:'column',gap:0}}>
-                      <div className="tile" onClick={()=>onOpenDetail(m,j)}>
-                        <img src={src} alt="" className="tile-img"/>
-                        <div className="tile-actions">
-                          <a href={src} download={`gen-${i}-${j}.png`} className="tile-act" onClick={e=>e.stopPropagation()}>
-                            <Icon name="download" size={12}/>
-                          </a>
-                          <div className="tile-act"><Icon name="expand" size={12}/></div>
-                        </div>
+                    <div key={j} className="tile" onClick={()=>onOpenDetail(m,j)}>
+                      <img src={src} alt="" className="tile-img"/>
+                      <div className="tile-actions">
+                        <a href={src} download={`gen-${i}-${j}.png`} className="tile-act" onClick={e=>e.stopPropagation()}>
+                          <Icon name="download" size={12}/>
+                        </a>
+                        <div className="tile-act"><Icon name="expand" size={12}/></div>
                       </div>
-                      <ReactionBar id={`${i}-${j}`} reactions={reactions} setReaction={setReaction}/>
                     </div>
                   ))
             }
           </div>
+          {/* Actions / Refine questionnaire */}
           {!m.loading && !m.error && (
-            <div style={{display:'flex',gap:6,marginTop:10}}>
-              <button className="action-pill" onClick={()=>onRegenerate(m,i)}>
-                <Icon name="refresh" size={11}/> Regenerate
-              </button>
-              <button className="action-pill"><Icon name="edit" size={11}/> Refine</button>
-            </div>
+            refining === i
+              ? <RefineForm
+                  onSubmit={state => { setRefining(null); onRefine(m, i, state); }}
+                  onCancel={() => setRefining(null)}
+                />
+              : <div style={{display:'flex',gap:6,marginTop:10}}>
+                  <button className="action-pill" onClick={()=>onRegenerate(m,i)}>Regenerate</button>
+                  <button className="action-pill" onClick={()=>setRefining(i)}>Refine</button>
+                </div>
           )}
         </div>
       ))}
@@ -438,16 +521,16 @@ function ExploreResults({ stream, reactions, setReaction, onRegenerate, onOpenDe
 // ── Explore page ──────────────────────────────────────────────────────────────
 
 function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPrompt, onSend,
-  activePreset, setPreset, openCreateBrand, stream, reactions, setReaction, onRegenerate,
+  activePreset, setPreset, openCreateBrand, stream, onRegenerate, onRefine,
   onOpenDetail, attached, setAttached }: {
   brand: Brand | null; brands: Brand[]; activeBrand: string | null;
   setActiveBrand: (id: string | null) => void;
   prompt: string; setPrompt: (v: string) => void; onSend: () => void;
   activePreset: string | null; setPreset: (id: string | null) => void;
   openCreateBrand: () => void;
-  stream: StreamMessage[]; reactions: Record<string, Reaction>;
-  setReaction: (id: string, r: Reaction) => void;
+  stream: StreamMessage[];
   onRegenerate: (msg: StreamMessage, idx: number) => void;
+  onRefine: (msg: StreamMessage, idx: number, state: RefineState) => void;
   onOpenDetail: (msg: StreamMessage, imgIdx: number) => void;
   attached: AttachedImage | null; setAttached: (img: AttachedImage | null) => void;
 }) {
@@ -500,8 +583,8 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
         </div>
 
         {/* Right: results */}
-        <ExploreResults stream={stream} reactions={reactions} setReaction={setReaction}
-          onRegenerate={onRegenerate} onOpenDetail={onOpenDetail} brand={brand}/>
+        <ExploreResults stream={stream} onRegenerate={onRegenerate} onRefine={onRefine}
+          onOpenDetail={onOpenDetail} brand={brand}/>
       </div>
     );
   }
@@ -516,10 +599,9 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
         openCreateBrand={openCreateBrand} attached={attached} setAttached={setAttached}/>
       <div className="cat-strip">
         {PRESETS.map(p=>(
-          <button key={p.id} className={`cat-card ${activePreset===p.id?'active':''}`}
+          <button key={p.id} className={`preset-pill ${activePreset===p.id?'active':''}`}
             onClick={()=>setPreset(activePreset===p.id?null:p.id)}>
-            <span className="label">{p.name}</span>
-            {p.cover && <span className="stack"><div className={p.cover}/><div className={p.cover}/><div className={p.cover}/></span>}
+            {p.name}
           </button>
         ))}
       </div>
@@ -603,37 +685,63 @@ function BrandEditor({ brand: init, onBack, onSave }: {
 }) {
   const [name, setName] = useState(init?.name ?? '');
   const [voice, setVoice] = useState(init?.voice ?? '');
-  const [palette, setPalette] = useState<string[]>(init?.palette ?? ['#F5E6D3','#A87856','#3F2A1E','#1A0F0A']);
+  const [palette, setPalette] = useState<string[]>(init?.palette ?? []);
   const [logoImage, setLogoImage] = useState<string|undefined>(init?.logoImage);
   const [logoText, setLogoText] = useState(init?.logoText ?? '');
   const [refImages, setRefImages] = useState<ReferenceImage[]>(init?.referenceImages ?? []);
   const logoRef = useRef<HTMLInputElement>(null);
   const refRef = useRef<HTMLInputElement>(null);
 
+  // Merge extracted colors from logo + refs, dedup, keep up to 6
+  const refreshPalette = useCallback(async (logo: string | undefined, refs: ReferenceImage[]) => {
+    const sources = [...(logo ? [logo] : []), ...refs.map(r => r.data)];
+    if (!sources.length) { setPalette([]); return; }
+    const perSource = logo ? 3 : 2;
+    const all: string[] = [];
+    for (const src of sources.slice(0, 4)) {
+      const cols = await extractDominantColors(src, perSource);
+      all.push(...cols);
+    }
+    // Deduplicate by hex value, keep first occurrence
+    const seen = new Set<string>();
+    const deduped = all.filter(c => { if (seen.has(c)) return false; seen.add(c); return true; });
+    setPalette(deduped.slice(0, 6));
+  }, []);
+
   const handleLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
-    // Logo: slightly larger so the model can read wordmarks clearly
     const d = await resizeImage(f, 800, 0.85);
     setLogoImage(d);
-    if (!logoText) setLogoText(f.name.replace(/\.[^.]+$/,''));
+    if (!logoText) setLogoText(f.name.replace(/\.[^.]+$/, ''));
+    await refreshPalette(d, refImages);
   };
+
   const handleRefs = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
+    const newRefs: ReferenceImage[] = [];
     for (const f of files.slice(0, 5 - refImages.length)) {
-      // Reference images: 512px is plenty for style extraction
       const d = await resizeImage(f, 512, 0.75);
-      setRefImages(p=>[...p,{id:Math.random().toString(36).slice(2),data:d,mimeType:'image/jpeg'}]);
+      newRefs.push({ id: Math.random().toString(36).slice(2), data: d, mimeType: 'image/jpeg' });
     }
+    const updated = [...refImages, ...newRefs];
+    setRefImages(updated);
+    await refreshPalette(logoImage, updated);
     e.target.value = '';
+  };
+
+  const removeRef = async (id: string) => {
+    const updated = refImages.filter(r => r.id !== id);
+    setRefImages(updated);
+    await refreshPalette(logoImage, updated);
   };
 
   const save = () => {
     if (!name.trim()) return;
     onSave({
       id: init?.id ?? Math.random().toString(36).slice(2),
-      name: name.trim(), logoText: logoText||name.split(' ')[0], logoImage,
+      name: name.trim(), logoText: logoText || name.split(' ')[0], logoImage,
       palette, voice: voice.trim(), edited: 'just now',
-      keywords: [], samples: init?.samples ?? ['grad-1','grad-3','grad-9'],
+      keywords: [], samples: init?.samples ?? ['grad-1', 'grad-3', 'grad-9'],
       referenceImages: refImages,
     });
   };
@@ -643,25 +751,25 @@ function BrandEditor({ brand: init, onBack, onSave }: {
       <div className="page-head">
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
           <button className="btn-bare" onClick={onBack}><Icon name="chevL" size={16}/></button>
-          <span style={{fontSize:12,color:'var(--text-3)'}}>Brand DNA / {init?'Edit':'Create'}</span>
+          <span style={{fontSize:12,color:'var(--text-3)'}}>Brand DNA / {init ? 'Edit' : 'Create'}</span>
         </div>
-        <h1 className="page-h1">{init?<>Edit <em>{init.name}</em></>:<>Define a new <em>Brand DNA</em></>}</h1>
+        <h1 className="page-h1">{init ? <>Edit <em>{init.name}</em></> : <>Define a new <em>Brand DNA</em></>}</h1>
         <p className="page-sub">Save your brand identity once. Apply it to any prompt to keep generations on-brand.</p>
       </div>
       <div className="page-content">
         <div className="editor">
           <div className="editor-main">
 
-            {/* 1 — Brand basics: name + voice only */}
+            {/* 1 — Brand basics */}
             <div className="section-block">
               <div className="section-h-form"><span className="section-num">1</span> Brand basics</div>
               <div className="field">
                 <label className="field-label">Brand name</label>
-                <input className="input" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Foundry Coffee"/>
+                <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Foundry Coffee"/>
               </div>
               <div className="field" style={{marginBottom:0}}>
                 <label className="field-label">Voice &amp; feel <span style={{color:'var(--text-4)',fontWeight:400}}> — how does this brand feel?</span></label>
-                <textarea className="textarea" value={voice} onChange={e=>setVoice(e.target.value)}
+                <textarea className="textarea" value={voice} onChange={e => setVoice(e.target.value)}
                   placeholder="e.g. Earthy, slow, handcrafted — warm textures, muted tones, tactile."/>
               </div>
             </div>
@@ -669,7 +777,7 @@ function BrandEditor({ brand: init, onBack, onSave }: {
             {/* 2 — Logo */}
             <div className="section-block">
               <div className="section-h-form"><span className="section-num">2</span> Logo</div>
-              <div className={`logo-drop ${logoImage?'has-file':''}`} onClick={()=>logoRef.current?.click()}>
+              <div className={`logo-drop ${logoImage ? 'has-file' : ''}`} onClick={() => logoRef.current?.click()}>
                 {logoImage
                   ? <img src={logoImage} alt="Logo" style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',padding:8}}/>
                   : <div style={{textAlign:'center'}}><Icon name="upload" size={18}/><div style={{marginTop:6}}>Click to upload logo</div><div style={{fontSize:10,marginTop:2,color:'var(--text-4)'}}>SVG, PNG, JPG</div></div>}
@@ -678,32 +786,36 @@ function BrandEditor({ brand: init, onBack, onSave }: {
               {logoImage && (
                 <div style={{marginTop:8,display:'flex',gap:6}}>
                   <input className="input" style={{flex:1,padding:'6px 10px',fontSize:12}} placeholder="Wordmark text"
-                    value={logoText} onChange={e=>setLogoText(e.target.value)}/>
-                  <button className="btn-icon" onClick={()=>{setLogoImage(undefined);setLogoText('');}}><Icon name="trash" size={13}/></button>
+                    value={logoText} onChange={e => setLogoText(e.target.value)}/>
+                  <button className="btn-icon" onClick={async () => { setLogoImage(undefined); setLogoText(''); await refreshPalette(undefined, refImages); }}>
+                    <Icon name="trash" size={13}/>
+                  </button>
                 </div>
               )}
             </div>
 
-            {/* 3 — Reference imagery (higher priority than color — comes first) */}
+            {/* 3 — Reference imagery */}
             <div className="section-block">
-              <div className="section-h-form"><span className="section-num">3</span> Reference imagery
+              <div className="section-h-form">
+                <span className="section-num">3</span> Reference imagery
                 <span style={{marginLeft:'auto',fontSize:10,color:'var(--accent-text)',background:'var(--accent-soft)',padding:'2px 8px',borderRadius:100}}>Highest priority</span>
               </div>
               <p style={{fontSize:12,color:'var(--text-3)',marginBottom:12}}>
-                Upload up to 5 example images. The model will extract their visual style and use it to guide every generation — this has more influence than the color palette below.
+                Upload up to 5 example images. The model extracts their visual style for every generation.
+                Colors are auto-detected from your logo and references.
               </p>
               <div className="ref-grid">
-                {refImages.map(img=>(
+                {refImages.map(img => (
                   <div key={img.id} className="ref-tile" style={{position:'relative'}}>
                     <img src={img.data} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                    <button onClick={()=>setRefImages(p=>p.filter(r=>r.id!==img.id))}
+                    <button onClick={() => removeRef(img.id)}
                       style={{position:'absolute',top:4,right:4,width:20,height:20,borderRadius:4,background:'rgba(0,0,0,0.6)',color:'white',display:'grid',placeItems:'center'}}>
                       <Icon name="x" size={10}/>
                     </button>
                   </div>
                 ))}
-                {Array.from({length:Math.max(0, 5 - refImages.length)}).map((_,i)=>(
-                  <div key={`add-${i}`} className="ref-tile add" onClick={()=>refRef.current?.click()}>
+                {Array.from({length: Math.max(0, 5 - refImages.length)}).map((_, i) => (
+                  <div key={`add-${i}`} className="ref-tile add" onClick={() => refRef.current?.click()}>
                     <Icon name="plus" size={14}/>
                   </div>
                 ))}
@@ -711,26 +823,22 @@ function BrandEditor({ brand: init, onBack, onSave }: {
               <input ref={refRef} type="file" className="upload-input" accept="image/*" multiple onChange={handleRefs}/>
             </div>
 
-            {/* 4 — Colors */}
-            <div className="section-block">
-              <div className="section-h-form"><span className="section-num">4</span> Color palette</div>
-              <p style={{fontSize:12,color:'var(--text-3)',marginBottom:12}}>Click a swatch to change it. Used when no reference images are present.</p>
-              <div className="swatch-row">
-                {palette.map((c,i)=>(
-                  <div key={i} className="swatch">
-                    <input type="color" value={c} onChange={e=>setPalette(p=>p.map((x,j)=>j===i?e.target.value:x))}
-                      style={{width:44,height:44,borderRadius:8,border:'1px solid var(--line)',padding:2,background:'var(--bg-2)',cursor:'pointer'}}/>
-                    <div className="swatch-hex">{c.toUpperCase()}</div>
-                  </div>
-                ))}
-                {palette.length < 6 && (
-                  <div className="swatch">
-                    <div className="swatch-add" onClick={()=>setPalette(p=>[...p,'#888888'])}><Icon name="plus" size={12}/></div>
-                    <div className="swatch-hex" style={{opacity:0}}>add</div>
-                  </div>
-                )}
+            {/* Auto-detected palette (read-only) */}
+            {palette.length > 0 && (
+              <div className="section-block">
+                <div className="section-h-form"><span className="section-num">4</span> Detected color palette
+                  <span style={{marginLeft:'auto',fontSize:10,color:'var(--text-4)'}}>Auto-detected from your images</span>
+                </div>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:4}}>
+                  {palette.map((c, i) => (
+                    <div key={i} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+                      <div style={{width:40,height:40,borderRadius:8,background:c,border:'1px solid var(--line)'}}/>
+                      <div style={{fontSize:10,color:'var(--text-3)',fontFamily:'monospace'}}>{c.toUpperCase()}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
               <button className="btn btn-ghost" onClick={onBack}>Cancel</button>
@@ -740,13 +848,15 @@ function BrandEditor({ brand: init, onBack, onSave }: {
 
           <aside className="editor-preview">
             <div className="preview-h">Live preview</div>
-            <div className={`preview-card ${init?.samples?.[0]??'grad-1'}`}>
+            <div className={`preview-card ${init?.samples?.[0] ?? 'grad-1'}`}>
               {logoImage
                 ? <img src={logoImage} alt="" style={{position:'absolute',bottom:12,left:14,height:40,objectFit:'contain',maxWidth:'60%'}}/>
                 : logoText ? <div className="corner-logo">{logoText}</div> : null}
             </div>
-            <div className="preview-pal">{palette.map((c,i)=><span key={i} style={{background:c}}/>)}</div>
-            <div className="preview-row"><span className="k">Voice</span><span style={{maxWidth:160,textAlign:'right',fontSize:11}}>{voice||'Not set'}</span></div>
+            {palette.length > 0 && (
+              <div className="preview-pal">{palette.map((c, i) => <span key={i} style={{background:c}}/>)}</div>
+            )}
+            <div className="preview-row"><span className="k">Voice</span><span style={{maxWidth:160,textAlign:'right',fontSize:11}}>{voice || 'Not set'}</span></div>
             <div className="preview-row">
               <span className="k">References</span>
               <span style={{color:refImages.length>0?'#C7F25E':'var(--text-3)'}}>
@@ -755,7 +865,13 @@ function BrandEditor({ brand: init, onBack, onSave }: {
             </div>
             <div className="preview-row">
               <span className="k">Logo</span>
-              <span style={{color:logoImage?'#C7F25E':'var(--text-3)'}}>{logoImage?'Uploaded':'None'}</span>
+              <span style={{color:logoImage?'#C7F25E':'var(--text-3)'}}>{logoImage ? 'Uploaded' : 'None'}</span>
+            </div>
+            <div className="preview-row">
+              <span className="k">Colors</span>
+              <span style={{color:palette.length>0?'#C7F25E':'var(--text-3)'}}>
+                {palette.length > 0 ? `${palette.length} detected` : 'Upload images'}
+              </span>
             </div>
           </aside>
         </div>
@@ -766,9 +882,8 @@ function BrandEditor({ brand: init, onBack, onSave }: {
 
 // ── Detail modal ──────────────────────────────────────────────────────────────
 
-function DetailModal({ detail, setDetail, reactions, setReaction }: {
+function DetailModal({ detail, setDetail }: {
   detail: DetailState; setDetail: (d: DetailState | null) => void;
-  reactions: Record<string, Reaction>; setReaction: (id: string, r: Reaction) => void;
 }) {
   const brand = detail.brand;
   const img = detail.images[detail.idx];
@@ -874,14 +989,9 @@ export default function App() {
   const [prompt, setPrompt] = useState('');
   const [activePreset, setActivePreset] = useState<string|null>(null);
   const [detail, setDetail] = useState<DetailState|null>(null);
-  const [reactions, setReactions] = useState<Record<string,Reaction>>({});
   const [attached, setAttached] = useState<AttachedImage|null>(null);
 
   const brand = brands.find(b => b.id === activeBrand) ?? null;
-
-  const setReaction = useCallback((id: string, r: Reaction) => {
-    setReactions(prev => ({ ...prev, [id]: r }));
-  }, []);
 
   const generateImages = useCallback(async (
     userPrompt: string, msgIdx: number, attachedImg: AttachedImage | null
@@ -969,6 +1079,24 @@ export default function App() {
     });
   }, [generateImages]);
 
+  const handleRefine = useCallback((msg: StreamMessage, idx: number, state: RefineState) => {
+    if (!msg.prompt) return;
+    // Build a refined prompt from the original + structured feedback
+    const issues = state.q1.length ? `Issues: ${state.q1.join(', ')}.` : '';
+    const changes = state.q2.length ? `Changes needed: ${state.q2.join(', ')}.` : '';
+    const focus = state.q3.length ? `Focus on: ${state.q3.join(', ')}.` : '';
+    const notes = state.q4.trim() ? `Direction: ${state.q4.trim()}` : '';
+    const feedback = [issues, changes, focus, notes].filter(Boolean).join(' ');
+    const refinedPrompt = `${msg.prompt}\n\nREFINEMENT REQUEST: The previous generation had problems. ${feedback} Please generate a significantly improved version that fixes these specific issues while maintaining full brand DNA compliance.`;
+
+    setStream(prev => {
+      const next = [...prev];
+      next[idx] = { role: 'asst', loading: true };
+      setTimeout(() => generateImages(refinedPrompt, idx, null), 0);
+      return next;
+    });
+  }, [generateImages]);
+
   const startCreate = () => { setEditingBrand(null); setPage('editor'); };
   const startEdit = (b: Brand) => { setEditingBrand(b); setPage('editor'); };
   const handleSaveBrand = (b: Brand) => {
@@ -994,8 +1122,9 @@ export default function App() {
             prompt={prompt} setPrompt={setPrompt} onSend={send}
             activePreset={activePreset} setPreset={setActivePreset}
             openCreateBrand={startCreate}
-            stream={stream} reactions={reactions} setReaction={setReaction}
+            stream={stream}
             onRegenerate={handleRegenerate}
+            onRefine={handleRefine}
             onOpenDetail={(msg, imgIdx) => setDetail({ images: msg.images??[], idx: imgIdx, prompt: msg.prompt??'', brand: brand??undefined })}
             attached={attached} setAttached={setAttached}
           />
@@ -1013,7 +1142,7 @@ export default function App() {
       </div>
 
       {detail && (
-        <DetailModal detail={detail} setDetail={setDetail} reactions={reactions} setReaction={setReaction}/>
+        <DetailModal detail={detail} setDetail={setDetail}/>
       )}
     </div>
   );

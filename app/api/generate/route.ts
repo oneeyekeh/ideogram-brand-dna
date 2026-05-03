@@ -177,54 +177,19 @@ function buildBrandContext(brand: BrandDNA, hasLogo: boolean, refCount: number):
 // ─────────────────────────────────────────────────────────────────────────────
 // STEP 3 — Style preset modifier
 //
-// Each preset adds photographic/design direction ON TOP of brand rules.
-// Includes technical camera specs to steer the model toward professional output.
-// These co-exist with brand DNA — they shape composition, not override brand.
+// Preset names are shown in the UI for user context only.
+// They are intentionally NOT injected into the prompt — brand DNA + quality
+// standards are the sole generation drivers. Edit this map if you want to
+// re-enable preset prompt injection in buildFullPrompt.
 // ─────────────────────────────────────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const PRESET_MODIFIERS: Record<string, string> = {
-  editorial:
-    'PHOTOGRAPHY STYLE — Editorial (apply within brand constraints):\n' +
-    '  Dramatic single-source directional lighting with deep, intentional shadows.\n' +
-    '  High contrast ratio (5:1 or greater). Magazine-quality composition.\n' +
-    '  Equivalent to 85mm f/2.0, ISO 100, precise metering on subject.\n' +
-    '  Mood and emotion are the primary subject — technical perfection serves feeling.',
-
-  product:
-    'PHOTOGRAPHY STYLE — Product (apply within brand constraints):\n' +
-    '  Professional studio: seamless neutral or brand-palette background.\n' +
-    '  Three-point lighting with softbox key, fill, and rim separation.\n' +
-    '  Equivalent to 100mm macro f/8, ISO 100 — maximum depth of field, zero noise.\n' +
-    '  Product perfectly centered. Every detail of materials and surface must be crisp.\n' +
-    '  No environmental distractions. The product IS the image.',
-
-  lifestyle:
-    'PHOTOGRAPHY STYLE — Lifestyle (apply within brand constraints):\n' +
-    '  Candid authentic moment, warm soft natural or golden-hour light.\n' +
-    '  Genuine human presence; emotions feel unposed and real.\n' +
-    '  Equivalent to 35mm f/2.0 — slight environmental context visible.\n' +
-    '  Shallow depth of field draws focus to the hero element naturally.',
-
-  social:
-    'PHOTOGRAPHY STYLE — Social Media (apply within brand constraints):\n' +
-    '  Vibrant, high-energy. Optimized for square 1:1 or vertical 4:5 crop.\n' +
-    '  Bold visual hierarchy — readable instantly at thumbnail (150px) size.\n' +
-    '  Eye-catching contrast and saturation within the brand palette.\n' +
-    '  Single clear hero element — no visual clutter.',
-
-  banner:
-    'PHOTOGRAPHY STYLE — Web Banner (apply within brand constraints):\n' +
-    '  Wide cinematic composition — 16:9 or 3:1 aspect feel.\n' +
-    '  Strong intentional negative space on LEFT or RIGHT third for copy overlay.\n' +
-    '  Equivalent to 24mm wide, low angle or level — grand, impactful scale.\n' +
-    '  Single unambiguous visual story. Minimal elements, maximum impact.',
-
-  package:
-    'PHOTOGRAPHY STYLE — Packaging (apply within brand constraints):\n' +
-    '  Hero product in 3/4 view or straight-on. Soft studio lighting.\n' +
-    '  Subtle surface reflection below product — polished marble or acrylic.\n' +
-    '  Equivalent to 90mm f/11 — sharp from front to back of package.\n' +
-    '  Tactile material quality clearly visible: matte, gloss, texture, emboss.\n' +
-    '  Logo and type on packaging rendered with perfect legibility.',
+  editorial: 'Editorial',
+  product:   'Product',
+  lifestyle: 'Lifestyle',
+  social:    'Social post',
+  banner:    'Web banner',
+  package:   'Packaging',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -232,14 +197,15 @@ const PRESET_MODIFIERS: Record<string, string> = {
 //
 // Final text block sent to the model. Structure:
 //   [Brand DNA]        — who the brand is + mandatory rules
-//   [Preset modifier]  — photographic style direction
 //   [Quality standards]— technical quality requirements
 //   [Generation task]  — the user's actual request
+//
+// Preset is received but not injected — it's a UI label only.
 // ─────────────────────────────────────────────────────────────────────────────
 function buildFullPrompt(
   userPrompt: string,
   brand: BrandDNA | null | undefined,
-  preset: string | null | undefined,
+  _preset: string | null | undefined,
   hasLogo: boolean,
   refCount: number,
 ): string {
@@ -247,10 +213,6 @@ function buildFullPrompt(
 
   if (brand) {
     sections.push(buildBrandContext(brand, hasLogo, refCount));
-  }
-
-  if (preset && preset !== 'general' && PRESET_MODIFIERS[preset]) {
-    sections.push(PRESET_MODIFIERS[preset]);
   }
 
   sections.push(QUALITY_STANDARDS);
