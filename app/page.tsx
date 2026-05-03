@@ -118,19 +118,19 @@ const DEFAULT_BRANDS: Brand[] = [
 
 const PROMPT_SUGGESTIONS = [
   {
-    label: 'Product shot',
-    sub: 'Studio · clean background',
-    prompt: 'Professional studio product shot on a clean minimal surface, brand logo clearly visible, sharp focus, neutral background',
+    prompt: 'Studio product hero shot — brand logo faithfully rendered on the product, soft directional lighting, pristine neutral background, tack-sharp focus on every material detail, commercial photography quality suitable for print campaigns',
   },
   {
-    label: 'Lifestyle moment',
-    sub: 'Candid · natural light',
-    prompt: 'Authentic lifestyle photo of someone using the product in a natural on-brand moment, warm natural light, shallow depth of field',
+    prompt: 'Authentic lifestyle moment — person naturally holding or using the product in an aspirational real-world setting, golden-hour window light, shallow depth of field, candid expression, the brand\'s color palette woven into the environment',
   },
   {
-    label: 'Campaign hero',
-    sub: 'Editorial · full bleed',
-    prompt: 'Bold campaign hero image, dramatic lighting, minimal composition with strong negative space, publication-ready quality',
+    prompt: 'Campaign hero image — bold cinematic wide composition, dramatic single-source lighting with deep intentional shadows, strong negative space on one side for headline copy, the brand identity is felt in every visual choice, magazine editorial quality',
+  },
+  {
+    prompt: 'Social media content — product as the undeniable hero, vibrant use of brand palette in the background and props, graphic composition that reads instantly at thumbnail size, energetic and thumb-stopping, no clutter',
+  },
+  {
+    prompt: 'Abstract brand mood — close-up macro study of textures and materials in the brand\'s exact color palette, no people or product, purely atmospheric, evokes the brand\'s emotional tone through surface, light, and material alone',
   },
 ];
 
@@ -365,11 +365,6 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
           )}
         </div>
 
-        {!compact && (
-          <button className={`tool-pill ${activePreset?'active':''}`} onClick={()=>setPreset(activePreset?null:'editorial')}>
-            <Icon name="layers" size={11}/> Style
-          </button>
-        )}
         <button className="tool-pill"><Icon name="ratio" size={11}/> 1:1</button>
         <div className="spacer"/>
         <button className="send-btn" onClick={onSend} disabled={!value.trim() && !attached}>
@@ -626,11 +621,10 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
         brand={brand} setActiveBrand={setActiveBrand} brands={brands}
         activePreset={activePreset} setPreset={setPreset}
         openCreateBrand={openCreateBrand} attached={attached} setAttached={setAttached}/>
-      <div className="prompt-suggestions">
-        {PROMPT_SUGGESTIONS.map(s=>(
-          <button key={s.label} className="suggestion-card" onClick={()=>{ setPrompt(s.prompt); }}>
-            <div className="suggestion-label">{s.label}</div>
-            <div className="suggestion-sub">{s.sub}</div>
+      <div className="prompt-chips">
+        {PROMPT_SUGGESTIONS.map((s, i)=>(
+          <button key={i} className="prompt-chip" onClick={()=>setPrompt(s.prompt)}>
+            {s.prompt}
           </button>
         ))}
       </div>
