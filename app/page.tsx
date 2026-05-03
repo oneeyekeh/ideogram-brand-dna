@@ -130,77 +130,79 @@ const DEFAULT_BRANDS: Brand[] = [
   { id: 'plume', name: 'Plume Studio', logoText: 'Plume', palette: ['#FFE5EC','#FF7AA2','#5B1339','#FFFFFF'], voice: 'Playful, bold, expressive.', edited: '3d ago', keywords: ['soft pinks','high contrast','paper textures'], samples: ['grad-2','grad-5','grad-8'] },
 ];
 
-const PROMPT_SUGGESTIONS = [
+const PROMPT_SUGGESTIONS: { label: string; prompt: string; hl: string[] }[] = [
   {
-    prompt: 'Clean product hero — studio product shot of [product], white background, soft shadow, professional lighting, no text, logo accurate if visible',
+    label: 'Product Hero',
+    prompt: 'Studio product hero shot on clean white background, soft dramatic lighting, logo faithfully rendered, commercial grade sharpness and detail',
+    hl: ['product hero shot', 'logo faithfully rendered', 'commercial grade'],
   },
   {
-    prompt: 'Lifestyle product flat lay — flat lay of [product] on [marble/wood/linen] surface, natural light, minimal props, brand colors [X, Y]',
+    label: 'Lifestyle',
+    prompt: 'Authentic lifestyle moment — person naturally interacting with the product, golden hour light, editorial candid feel, brand palette visible',
+    hl: ['lifestyle moment', 'golden hour', 'editorial candid'],
   },
   {
-    prompt: 'Product in environment — [product] placed on a cafe table, golden hour light, warm tones, lifestyle editorial feel',
+    label: 'Campaign Hero',
+    prompt: 'Campaign hero image — bold cinematic wide composition, dramatic lighting, brand colors as the visual anchor, no text overlay',
+    hl: ['campaign hero', 'cinematic', 'brand colors'],
   },
   {
-    prompt: 'Multiple product variants — three [products] in a row, clean background, matching brand palette [colors], product photography',
+    label: 'Flat Lay',
+    prompt: 'Editorial flat lay — product arranged on marble surface with minimal props, overhead angle, brand palette accents, natural diffused light',
+    hl: ['flat lay', 'overhead angle', 'brand palette'],
   },
   {
-    prompt: 'Person holding product — lifestyle photo of a [young woman] holding [product], outdoor summer setting, candid, brand colors [X]',
+    label: 'Person + Product',
+    prompt: 'Person using the product in a real everyday setting — shallow depth of field, natural light, no full face, lifestyle editorial tone',
+    hl: ['shallow depth of field', 'natural light', 'lifestyle editorial'],
   },
   {
-    prompt: 'Person using product — person drinking from a [branded cup] at a coffee shop, warm atmosphere, shallow depth of field',
+    label: 'Brand Mood',
+    prompt: 'Abstract brand mood image — close-up macro of material textures and surfaces, brand palette tones throughout, no product needed',
+    hl: ['brand mood', 'macro', 'brand palette'],
   },
   {
-    prompt: 'Close-up hands with product — close-up of hands holding [product], minimal background, natural light, no full face, logo accurate if visible',
+    label: 'Story Vertical',
+    prompt: 'Vertical 9:16 story format — bold minimal composition, top third left clear for text overlay, brand accent color as key visual element',
+    hl: ['9:16 story format', 'text overlay', 'brand accent'],
   },
   {
-    prompt: 'Group lifestyle shot — group of friends enjoying [product] at a picnic, sunny day, vibrant colors matching [brand palette]',
+    label: 'Group Scene',
+    prompt: 'Group of people genuinely enjoying the product — outdoor sunny setting, vibrant energy, brand colors woven naturally into the scene',
+    hl: ['brand colors', 'outdoor sunny'],
   },
   {
-    prompt: 'Apparel on model — fashion model wearing [dress/top/item], studio lighting, clean background, full body shot, brand styling',
+    label: 'Product Detail',
+    prompt: 'Extreme close-up of product surface or material texture — rich macro photography, brand palette tones, almost abstract in its beauty',
+    hl: ['close-up', 'macro photography', 'brand palette'],
   },
   {
-    prompt: 'Apparel flat lay — clothing flat lay of [item] on white background, neatly arranged, editorial style, brand palette accents',
+    label: 'Holiday Campaign',
+    prompt: 'Festive holiday scene with the product as hero — warm cozy atmosphere, seasonal color palette, gift-ready editorial styling',
+    hl: ['holiday scene', 'gift-ready', 'seasonal color'],
   },
   {
-    prompt: 'Accessory on model — model carrying [bag/jewelry/accessory] on a city street, candid editorial, brand colors [X, Y]',
+    label: 'Storefront Mood',
+    prompt: 'Cozy independent shop or studio interior — warm inviting atmosphere, brand aesthetic woven throughout the space, no people',
+    hl: ['shop or studio interior', 'brand aesthetic'],
   },
   {
-    prompt: 'Shoe hero shot — single sneaker or shoe on a clean concrete surface, side angle, dramatic lighting, no text',
-  },
-  {
-    prompt: 'Summer campaign — bright summer lifestyle image featuring [product], beach or outdoor setting, vibrant and energetic, brand colors [X]',
-  },
-  {
-    prompt: 'Back-to-school campaign — flat lay with [product], notebooks and pencils, fresh organized composition, color palette [X, Y]',
-  },
-  {
-    prompt: 'Holiday campaign — festive holiday scene with [product], warm lights, cozy atmosphere, brand colors [X] with gold accents',
-  },
-  {
-    prompt: 'Valentine campaign — romantic Valentine setup featuring [product], soft pink and red tones, candles, gift-ready styling',
-  },
-  {
-    prompt: 'Sale promo banner — bold promotional image for a summer sale featuring [product], energetic composition, brand colors [X, Y], no text',
-  },
-  {
-    prompt: 'Brand mood image — editorial lifestyle image matching brand aesthetic: [minimal/warm/urban/etc.], no product needed',
-  },
-  {
-    prompt: 'Location or storefront feel — cozy independent [cafe/boutique/studio] interior, warm lighting, inviting atmosphere, brand colors [X]',
-  },
-  {
-    prompt: 'Abstract brand texture — abstract background texture using brand colors [X, Y, Z], soft gradients, suitable for social media overlay',
-  },
-  {
-    prompt: 'Instagram square post — square format lifestyle image of [product], bold composition, brand colors [X], thumb-stopping visual',
-  },
-  {
-    prompt: 'Instagram Story vertical — vertical 9:16 lifestyle image of [product], bold and simple, top third empty for text overlay',
-  },
-  {
-    prompt: 'Facebook or LinkedIn banner — wide horizontal brand image, [product] featured, professional tone, brand colors [X, Y]',
+    label: 'Social Square',
+    prompt: 'Instagram-ready square post — product as the undeniable hero, vibrant brand palette, thumb-stopping composition, zero distractions',
+    hl: ['instagram-ready', 'brand palette', 'thumb-stopping'],
   },
 ];
+
+function highlightText(text: string, words: string[]): React.ReactNode {
+  if (!words.length) return text;
+  const escaped = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const pattern = new RegExp(`(${escaped.join('|')})`, 'gi');
+  const parts = text.split(pattern);
+  const wl = words.map(w => w.toLowerCase());
+  return parts.map((p, i) =>
+    wl.includes(p.toLowerCase()) ? <span key={i} className="prompt-hl">{p}</span> : p
+  );
+}
 
 const GALLERY_IMAGES = [
   'Pg48FMPgTI-rmB9PLU4gKg@2k.webp',
@@ -809,6 +811,35 @@ function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail, debugDoc
   );
 }
 
+// ── Prompt gallery ───────────────────────────────────────────────────────────
+
+function PromptGallery({ onSelect, onClose }: { onSelect: (p: string) => void; onClose: () => void }) {
+  return (
+    <div className="pg-overlay" onClick={onClose}>
+      <div className="pg-panel" onClick={e => e.stopPropagation()}>
+        <button className="pg-close" onClick={onClose}><Icon name="x" size={15}/></button>
+        <div className="pg-header">
+          <h2 className="pg-title">
+            <span className="pg-title-kicker">What will you create</span>
+            <em>on-brand</em> today?
+          </h2>
+          <p className="pg-sub">Pick a prompt to get started — every detail is editable before you generate.</p>
+        </div>
+        <div className="pg-body">
+          <div className="pg-grid">
+            {PROMPT_SUGGESTIONS.map((s, i) => (
+              <button key={i} className="pg-card" onClick={() => { onSelect(s.prompt); onClose(); }}>
+                <span className="pg-card-label">{s.label}</span>
+                <p className="pg-card-text">{highlightText(s.prompt, s.hl)}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Explore page ──────────────────────────────────────────────────────────────
 
 function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPrompt, onSend,
@@ -829,6 +860,7 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
   setDebugDoc: (doc: DebugDocState | null) => void;
 }) {
   const active = stream.length > 0;
+  const [showGallery, setShowGallery] = useState(false);
 
   if (active) {
     // Split layout: left chat + right results
@@ -877,17 +909,30 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
   // Idle: hero + composer + gallery
   return (
     <div className="explore">
-      <h1 className="hero-title">What will you create<br/><em>on-brand</em> today?</h1>
+      {showGallery && (
+        <PromptGallery
+          onSelect={p => { setPrompt(p); }}
+          onClose={() => setShowGallery(false)}
+        />
+      )}
+      <h1 className="hero-title">
+        <span className="hero-kicker">What will you create</span>
+        <em>on-brand</em> today?
+      </h1>
       <Composer value={prompt} setValue={setPrompt} onSend={onSend}
         brand={brand} setActiveBrand={setActiveBrand} brands={brands}
         activePreset={activePreset} setPreset={setPreset}
         openCreateBrand={openCreateBrand} attached={attached} setAttached={setAttached}/>
       <div className="prompt-chips">
-        {PROMPT_SUGGESTIONS.map((s, i)=>(
-          <button key={i} className="prompt-chip" onClick={()=>setPrompt(s.prompt)}>
-            {s.prompt}
+        {PROMPT_SUGGESTIONS.slice(0, 3).map((s, i) => (
+          <button key={i} className="prompt-chip" onClick={() => setPrompt(s.prompt)}>
+            <span className="chip-cat">{s.label}</span>
+            <span className="chip-text">{s.prompt.split('—')[0].trim().replace(/,$/, '')}</span>
           </button>
         ))}
+        <button className="prompt-chip prompt-chip-more" onClick={() => setShowGallery(true)}>
+          More prompts →
+        </button>
       </div>
       <ExploreGallery/>
     </div>
