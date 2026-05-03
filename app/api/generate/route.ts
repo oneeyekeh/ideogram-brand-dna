@@ -109,7 +109,7 @@ function buildBrandSection(brand: BrandDNA | null | undefined): string {
 function buildAssetsSection(hasLogo: boolean, refCount: number, brand?: BrandDNA | null): string {
   const lines = ['ASSETS'];
   lines.push(hasLogo
-    ? `- Logo attached: yes, official logo for ${brand?.name ?? 'the brand'}. Match its shape, colors, proportions, and weight when logo is requested or naturally belongs in the scene.`
+    ? `- Logo attached: yes, official logo for ${brand?.name ?? 'the brand'}. Include the logo visibly in the scene — render it accurately with correct shape, colors, proportions, and weight. Do not invent a substitute or place it out of frame.`
     : '- Logo attached: no. Do not invent a logo unless the user explicitly asks for one.');
   lines.push(refCount > 0
     ? `- References attached: ${refCount}. Use them for relevant subject, composition, typography feel, tone, material, layout, and mood.`

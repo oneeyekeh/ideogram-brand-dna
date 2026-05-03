@@ -1745,11 +1745,16 @@ export default function App() {
   const send = useCallback((finalPrompt: string) => {
     if (!finalPrompt.trim() && attached.length === 0) return;
     const rawPrompt = finalPrompt.trim() || 'Generate an on-brand image';
-    const previousPrompt = [...stream].reverse().find(m => m.role === 'asst' && m.prompt)?.prompt;
+    const previousAsstMsg = [...stream].reverse().find(m => m.role === 'asst' && m.prompt);
+    const previousPrompt = previousAsstMsg?.prompt;
     const userPrompt = previousPrompt
       ? `${previousPrompt}\n\nFOLLOW-UP REQUEST: ${rawPrompt}\nKeep this in the same session context unless the user asks for a new direction.`
       : rawPrompt;
-    const snap = attached.slice(0, 5);
+    // Carry forward previous reference images if user didn't attach new ones
+    const previousRefs = previousPrompt
+      ? ([...stream].reverse().find(m => m.role === 'user' && m.referenceImages?.length)?.referenceImages ?? [])
+      : [];
+    const snap = attached.length > 0 ? attached.slice(0, 5) : previousRefs;
     setPrompt('');
     setAttached([]);
     setViewingSessionId(null); // user is now creating new work, detach from history

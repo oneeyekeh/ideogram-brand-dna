@@ -48,15 +48,21 @@ export async function POST(req: NextRequest) {
   const useful = runs.flatMap(r => r.feedback).filter(f => f === 'up').length;
   const notUseful = runs.flatMap(r => r.feedback).filter(f => f === 'down').length;
 
+  // Brand DNA elements that are ALWAYS active (applied to every run via the base system prompt)
+  const alwaysActiveElements: string[] = [];
+  if (brand?.palette?.length) alwaysActiveElements.push('Palette');
+  if (brand?.tone) alwaysActiveElements.push('Voice / Tone');
+  if (brand?.hasLogo) alwaysActiveElements.push('Logo');
+
   const runsText = runs.map(r => {
     const feedbackStr = r.feedback.map((f, i) =>
       `Image ${i + 1}: ${f === 'up' ? '👍 useful' : f === 'down' ? '👎 not useful' : 'no rating'}`
     ).join(', ');
-    const elements = detectElements(r.prompt);
+    const overrideElements = detectElements(r.prompt);
     return [
       `Run ${r.runNumber}`,
       `Prompt: "${r.prompt.replace(/\s+/g, ' ').trim()}"`,
-      `Brand elements active: ${elements.length ? elements.join(', ') : 'none explicitly set'}`,
+      `Override elements (explicit in prompt): ${overrideElements.length ? overrideElements.join(', ') : 'none'}`,
       `Feedback: ${feedbackStr}`,
     ].join('\n');
   }).join('\n\n');
@@ -65,15 +71,21 @@ export async function POST(req: NextRequest) {
     'You are a brand AI analyst. Analyze this image-generation session and write a concise report.',
     'Be direct and opinionated. Base every rating on actual feedback evidence — do not guess.',
     '',
+    'IMPORTANT: Brand DNA elements (Palette, Voice/Tone, Logo when provided) are ALWAYS active in every run',
+    'because they are baked into the base system prompt sent to the model. They are not optional overrides.',
+    'Rate these elements based on whether the feedback suggests the model respected them.',
+    'Do NOT mark them as "Not tested" just because they were not explicitly mentioned in the user prompt.',
+    '',
     'Output EXACTLY this markdown structure, no extra sections:',
     '',
     '## Summary',
     '(keep the stats exactly as provided — do not change numbers)',
     '',
     '## Brand Element Performance',
-    'Rate each element that was tested in any run. Use ✓ Good, ✗ Weak, or — Not tested.',
+    'Rate each element. Use ✓ Good, ✗ Weak, or ~ Unclear (not enough feedback).',
     'One line per element: rating + one short sentence of evidence.',
-    'Only include elements that appear in the data below.',
+    'Always include the always-active Brand DNA elements listed below.',
+    'Also include any override elements that appeared in individual run prompts.',
     '',
     '## What Worked',
     '1–3 short bullets. Only write this if feedback clearly shows something succeeded.',
@@ -92,6 +104,8 @@ export async function POST(req: NextRequest) {
     `Voice: ${brand?.tone || 'not specified'}`,
     `Logo asset available: ${brand?.hasLogo ? 'yes' : 'no'}`,
     `Models used: ${models.join(', ') || 'unknown'}`,
+    '',
+    `ALWAYS-ACTIVE BRAND DNA ELEMENTS (present in every run): ${alwaysActiveElements.join(', ') || 'none'}`,
     '',
     `STATS: ${runs.length} runs | ${totalImages} images | ${useful} useful | ${notUseful} not useful`,
     '',
