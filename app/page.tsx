@@ -79,6 +79,14 @@ interface SavedImage {
 
 type ImageFeedback = Record<string, 'up' | 'down'>;
 
+interface SessionRecord {
+  id: string;
+  title: string;
+  createdAt: string;
+  stream: StreamMessage[];
+  imageFeedback: ImageFeedback;
+}
+
 // ── SVG Icon ──────────────────────────────────────────────────────────────────
 
 const paths: Record<string, React.ReactNode> = {
@@ -419,10 +427,10 @@ function Sidebar({ page, setPage }: {
         <div className="sb-name">ideogram</div>
       </div>
       {item('explore','explore','Explore')}
-      {item('sessions','layers','Session history')}
       {item('batch','grid','Batch')}
       <div className="sb-section">Library</div>
       {item('images','image2','My images')}
+      {item('sessions','layers','History')}
       {item('collections','folder','Collections')}
       {item('likes','heart','My likes')}
       <div className="sb-section">Elements</div>
@@ -837,6 +845,41 @@ function feedbackKey(msgIndex: number, imgIndex: number) {
   return `${msgIndex}:${imgIndex}`;
 }
 
+function buildSessionReportMarkdown(stream: StreamMessage[], imageFeedback: ImageFeedback) {
+  const runs = stream.map((m, i) => ({ m, i })).filter(({ m }) => m.role === 'asst' && (m.prompt || m.trace));
+  const totalImages = runs.reduce((sum, { m }) => sum + (m.images?.length ?? 0), 0);
+  const useful = Object.values(imageFeedback).filter(v => v === 'up').length;
+  const notUseful = Object.values(imageFeedback).filter(v => v === 'down').length;
+  const campaigns = Array.from(new Set(runs.map(({ m }) => m.trace?.campaignType).filter(Boolean)));
+  const brands = Array.from(new Set(runs.map(({ m }) => m.trace?.brandName).filter(Boolean)));
+  const models = Array.from(new Set(runs.map(({ m }) => m.trace?.modelName).filter(Boolean)));
+  const logs = runs.flatMap(({ m }) => m.trace?.decisionLog ?? []).slice(0, 12);
+
+  return [
+    '# session-report.md',
+    '',
+    '## Summary',
+    `- Runs: ${runs.length}`,
+    `- Images generated: ${totalImages}`,
+    `- Useful: ${useful}`,
+    `- Not useful: ${notUseful}`,
+    `- Brands: ${brands.join(', ') || 'none'}`,
+    `- Campaign types: ${campaigns.join(', ') || 'none classified'}`,
+    `- Models: ${models.join(', ') || 'none returned'}`,
+    '',
+    '## Session Prompts',
+    ...runs.map(({ m, i }) => `- Run ${i}: ${(m.prompt ?? m.trace?.prompt ?? 'pending').replace(/\s+/g, ' ').slice(0, 220)}`),
+    '',
+    '## Model Decision Notes',
+    ...(logs.length ? logs.map(item => `- ${item}`) : ['- No decision log yet.']),
+    '',
+    '## Takeaway',
+    useful + notUseful > 0
+      ? `The user marked ${useful} image(s) useful and ${notUseful} image(s) not useful. Use this feedback to judge which prompts, references, and overrides produced stronger brand adherence.`
+      : 'No image feedback has been recorded yet. Ask the user to thumbs up/down outputs before using this report for model performance judgment.',
+  ].join('\n');
+}
+
 function ExploreResults({ stream, imageFeedback, onRateImage, onRegenerate, onRefine, onOpenDetail, debugDoc, setDebugDoc }: {
   stream: StreamMessage[];
   imageFeedback: ImageFeedback;
@@ -924,6 +967,14 @@ function ExploreResults({ stream, imageFeedback, onRateImage, onRegenerate, onRe
           )}
         </div>
       ))}
+      {asstMsgs.length > 0 && (
+        <button
+          className="session-report-btn"
+          onClick={() => setDebugDoc({ title: 'session-report.md', markdown: buildSessionReportMarkdown(stream, imageFeedback) })}
+        >
+          <Icon name="layers" size={13}/> Session report
+        </button>
+      )}
     </div>
   );
 }
@@ -1452,54 +1503,49 @@ function ImagesPage({ images, onOpen }: { images: SavedImage[]; onOpen: (img: Sa
   );
 }
 
-function SessionHistoryPage({ stream, imageFeedback, onOpenExplore }: {
-  stream: StreamMessage[];
-  imageFeedback: ImageFeedback;
-  onOpenExplore: () => void;
+function sessionTitle(stream: StreamMessage[]) {
+  return stream.find(m => m.role === 'asst' && m.prompt)?.prompt?.slice(0, 72) || 'Untitled session';
+}
+
+function SessionHistoryPage({ currentStream, currentFeedback, sessions, onOpenSession, onOpenCurrent }: {
+  currentStream: StreamMessage[];
+  currentFeedback: ImageFeedback;
+  sessions: SessionRecord[];
+  onOpenSession: (session: SessionRecord) => void;
+  onOpenCurrent: () => void;
 }) {
-  const runs = stream.map((m, i) => ({ m, i })).filter(({ m }) => m.role === 'asst' && (m.prompt || m.trace));
-  const up = Object.values(imageFeedback).filter(v => v === 'up').length;
-  const down = Object.values(imageFeedback).filter(v => v === 'down').length;
+  const history = [
+    ...(currentStream.length ? [{ id: 'current', title: sessionTitle(currentStream), createdAt: 'Current session', stream: currentStream, imageFeedback: currentFeedback }] : []),
+    ...sessions,
+  ];
 
   return (
     <div className="session-page">
       <div className="session-head">
         <div>
-          <h1>Session history</h1>
-          <p>Review prompts, model responses, and image usefulness for this run.</p>
+          <h1>History</h1>
+          <p>Open a previous chat and continue generating from that session.</p>
         </div>
-        <button className="btn" onClick={onOpenExplore}><Icon name="explore" size={13}/> Back to Explore</button>
-      </div>
-      <div className="session-stats">
-        <div><strong>{runs.length}</strong><span>runs</span></div>
-        <div><strong>{up}</strong><span>useful</span></div>
-        <div><strong>{down}</strong><span>not useful</span></div>
       </div>
       <div className="session-list">
-        {runs.length === 0 && <div className="session-empty">No generations yet. Start in Explore, then come back here for the report.</div>}
-        {runs.map(({ m, i }) => {
-          const images = m.images ?? [];
-          const useful = images.filter((_, j) => imageFeedback[feedbackKey(i, j)] === 'up').length;
-          const notUseful = images.filter((_, j) => imageFeedback[feedbackKey(i, j)] === 'down').length;
+        {history.length === 0 && <div className="session-empty">No saved sessions yet. Start in Explore, then create a new chat to save history.</div>}
+        {history.map(session => {
+          const runs = session.stream.filter(m => m.role === 'asst' && (m.prompt || m.trace));
+          const images = runs.reduce((sum, m) => sum + (m.images?.length ?? 0), 0);
           return (
-            <div key={i} className="session-run">
+            <div key={session.id} className="session-run">
               <div className="session-run-main">
-                <div className="session-run-title">{m.trace?.campaignType ?? 'Campaign run'}</div>
-                <div className="session-run-prompt">{m.prompt ?? m.trace?.prompt ?? 'Generation pending'}</div>
+                <div className="session-run-title">{session.title}</div>
+                <div className="session-run-prompt">{session.createdAt}</div>
                 <div className="session-run-meta">
-                  <span>{m.trace?.modelName ?? 'model pending'}</span>
-                  <span>{m.trace?.brandName ?? 'No brand'}</span>
-                  <span>{images.length} images</span>
+                  <span>{runs.length} messages</span>
+                  <span>{images} images</span>
                 </div>
-                {m.trace?.decisionLog?.length ? (
-                  <div className="session-run-log">
-                    {m.trace.decisionLog.slice(0, 4).map((item, idx) => <span key={idx}>{item}</span>)}
-                  </div>
-                ) : null}
               </div>
               <div className="session-run-score">
-                <div><Icon name="thumbUp" size={13}/> {useful}</div>
-                <div><Icon name="thumbDown" size={13}/> {notUseful}</div>
+                <button className="session-open-btn" onClick={() => session.id === 'current' ? onOpenCurrent() : onOpenSession(session)}>
+                  Open
+                </button>
               </div>
             </div>
           );
@@ -1554,6 +1600,7 @@ export default function App() {
   const [attached, setAttached] = useState<AttachedImage[]>([]);
   const [savedImages, setSavedImages] = useState<SavedImage[]>([]);
   const [imageFeedback, setImageFeedback] = useState<ImageFeedback>({});
+  const [sessions, setSessions] = useLocalStorage<SessionRecord[]>('ideogram-sessions', []);
 
   const brand = brands.find(b => b.id === activeBrand) ?? null;
   const rateImage = useCallback((key: string, value: 'up' | 'down') => {
@@ -1564,6 +1611,18 @@ export default function App() {
       return next;
     });
   }, []);
+
+  const archiveCurrentSession = useCallback(() => {
+    if (!stream.some(m => m.role === 'asst' && (m.images?.length || m.error || m.trace))) return;
+    const record: SessionRecord = {
+      id: `${Date.now()}`,
+      title: sessionTitle(stream),
+      createdAt: new Date().toLocaleString(),
+      stream,
+      imageFeedback,
+    };
+    setSessions(prev => [record, ...prev].slice(0, 20));
+  }, [stream, imageFeedback, setSessions]);
 
   const generateImages = useCallback(async (
     userPrompt: string, msgIdx: number, attachedRefs: AttachedImage[]
@@ -1673,7 +1732,11 @@ export default function App() {
 
   const send = useCallback((finalPrompt: string) => {
     if (!finalPrompt.trim() && attached.length === 0) return;
-    const userPrompt = finalPrompt.trim() || 'Generate an on-brand image';
+    const rawPrompt = finalPrompt.trim() || 'Generate an on-brand image';
+    const previousPrompt = [...stream].reverse().find(m => m.role === 'asst' && m.prompt)?.prompt;
+    const userPrompt = previousPrompt
+      ? `${previousPrompt}\n\nFOLLOW-UP REQUEST: ${rawPrompt}\nKeep this in the same session context unless the user asks for a new direction.`
+      : rawPrompt;
     const snap = attached.slice(0, 5);
     setPrompt('');
     setAttached([]);
@@ -1686,7 +1749,7 @@ export default function App() {
       setTimeout(() => generateImages(userPrompt, idx, snap), 0);
       return next;
     });
-  }, [attached, brand, generateImages]);
+  }, [attached, brand, generateImages, stream]);
 
   const handleRegenerate = useCallback((msg: StreamMessage) => {
     if (!msg.prompt) return;
@@ -1713,7 +1776,9 @@ export default function App() {
 
     setStream(prev => {
       const parts = [state.q1, state.q2, state.q3].flat().filter(Boolean);
-      const label = parts.slice(0, 3).join(' · ') || 'Refinement';
+      const recentCampaign = [...prev].reverse().find(x => x.role === 'asst' && x.trace?.campaignType)?.trace?.campaignType;
+      const labelParts = [recentCampaign, ...parts].filter(Boolean);
+      const label = labelParts.slice(0, 4).join(' · ') || 'Refinement';
       const userMsg: StreamMessage = { role: 'user', text: `✦ Refine: ${label}`, variant: 'refine' };
       const loadingMsg: StreamMessage = { role: 'asst', loading: true, variant: 'refine', trace: createGenerationTrace(refinedPrompt, brand, refs, 'refine') };
       const next = [...prev, userMsg, loadingMsg];
@@ -1753,7 +1818,7 @@ export default function App() {
             imageFeedback={imageFeedback}
             onRateImage={rateImage}
             attached={attached} setAttached={setAttached}
-            onReset={() => { setStream([]); setDebugDoc(null); }}
+            onReset={() => { archiveCurrentSession(); setStream([]); setImageFeedback({}); setDebugDoc(null); }}
             debugDoc={debugDoc}
             setDebugDoc={setDebugDoc}
           />
@@ -1764,7 +1829,13 @@ export default function App() {
         )}
 
         {page === 'sessions' && (
-          <SessionHistoryPage stream={stream} imageFeedback={imageFeedback} onOpenExplore={() => setPage('explore')}/>
+          <SessionHistoryPage
+            currentStream={stream}
+            currentFeedback={imageFeedback}
+            sessions={sessions}
+            onOpenSession={(session) => { setStream(session.stream); setImageFeedback(session.imageFeedback); setDebugDoc(null); setPage('explore'); }}
+            onOpenCurrent={() => setPage('explore')}
+          />
         )}
 
         {page === 'editor' && (
