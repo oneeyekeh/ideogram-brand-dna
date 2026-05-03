@@ -16,21 +16,49 @@ interface SessionReportRequest {
   models: string[];
 }
 
-const ELEMENT_SIGNALS: Array<{ label: string; keywords: string[] }> = [
-  { label: 'Logo',        keywords: ['logo accurately rendered', 'no logo'] },
-  { label: 'Palette',     keywords: ['brand colors dominant', 'neutral muted color'] },
-  { label: 'Text / Copy', keywords: ['brand name as text', 'no text', 'intentional creative or campaign text'] },
-  { label: 'Face',        keywords: ['face clearly visible', 'no face visible'] },
-  { label: 'Person',      keywords: ['person in scene', 'no people in frame'] },
-  { label: 'Copy Space',  keywords: ['generous negative space'] },
-  { label: 'Atmosphere',  keywords: ['lifestyle atmosphere', 'clean studio'] },
+// Tags that explicitly disable a Brand DNA element via override
+const DNA_OVERRIDE_OFF: Array<{ element: string; offKeywords: string[] }> = [
+  { element: 'Logo',    offKeywords: ['no logo'] },
+  { element: 'Palette', offKeywords: ['neutral muted color palette'] },
+  { element: 'Text',    offKeywords: ['no text'] },
+  { element: 'Person',  offKeywords: ['no people in frame'] },
+  { element: 'Face',    offKeywords: ['no face visible'] },
 ];
 
-function detectElements(prompt: string): string[] {
+// Tags that explicitly enable an optional element via override
+const OVERRIDE_ON_SIGNALS: Array<{ label: string; keywords: string[] }> = [
+  { label: 'Logo (override on)',        keywords: ['logo accurately rendered'] },
+  { label: 'Text / Copy (override on)', keywords: ['brand name as text', 'intentional creative or campaign text'] },
+  { label: 'Face (override on)',        keywords: ['face clearly visible'] },
+  { label: 'Person (override on)',      keywords: ['person in scene'] },
+  { label: 'Copy Space (override on)',  keywords: ['generous negative space'] },
+  { label: 'Atmosphere (override on)',  keywords: ['lifestyle atmosphere', 'clean studio'] },
+];
+
+function describeRunElements(prompt: string, alwaysActive: string[]): string {
   const lower = prompt.toLowerCase();
-  return ELEMENT_SIGNALS
-    .filter(e => e.keywords.some(k => lower.includes(k.toLowerCase())))
-    .map(e => e.label);
+
+  const overriddenOff = DNA_OVERRIDE_OFF
+    .filter(d => d.offKeywords.some(k => lower.includes(k.toLowerCase())))
+    .map(d => `${d.element} (disabled via override)`);
+
+  const overriddenOn = OVERRIDE_ON_SIGNALS
+    .filter(d => d.keywords.some(k => lower.includes(k.toLowerCase())))
+    .map(d => d.label);
+
+  const activeFromDNA = alwaysActive.filter(
+    el => !DNA_OVERRIDE_OFF.some(d =>
+      d.element.toLowerCase() === el.toLowerCase() &&
+      d.offKeywords.some(k => lower.includes(k.toLowerCase()))
+    )
+  );
+
+  const all = [
+    ...activeFromDNA.map(e => `${e} (from Brand DNA)`),
+    ...overriddenOn,
+    ...overriddenOff,
+  ];
+  return all.length ? all.join(', ') : 'none';
 }
 
 export async function POST(req: NextRequest) {
@@ -58,11 +86,10 @@ export async function POST(req: NextRequest) {
     const feedbackStr = r.feedback.map((f, i) =>
       `Image ${i + 1}: ${f === 'up' ? '👍 useful' : f === 'down' ? '👎 not useful' : 'no rating'}`
     ).join(', ');
-    const overrideElements = detectElements(r.prompt);
     return [
       `Run ${r.runNumber}`,
       `Prompt: "${r.prompt.replace(/\s+/g, ' ').trim()}"`,
-      `Override elements (explicit in prompt): ${overrideElements.length ? overrideElements.join(', ') : 'none'}`,
+      `Active elements: ${describeRunElements(r.prompt, alwaysActiveElements)}`,
       `Feedback: ${feedbackStr}`,
     ].join('\n');
   }).join('\n\n');
@@ -71,10 +98,12 @@ export async function POST(req: NextRequest) {
     'You are a brand AI analyst. Analyze this image-generation session and write a concise report.',
     'Be direct and opinionated. Base every rating on actual feedback evidence — do not guess.',
     '',
-    'IMPORTANT: Brand DNA elements (Palette, Voice/Tone, Logo when provided) are ALWAYS active in every run',
-    'because they are baked into the base system prompt sent to the model. They are not optional overrides.',
-    'Rate these elements based on whether the feedback suggests the model respected them.',
-    'Do NOT mark them as "Not tested" just because they were not explicitly mentioned in the user prompt.',
+    'IMPORTANT: Brand DNA elements (Palette, Voice/Tone, Logo when provided) are active by default in every run.',
+    'They can be disabled per-run via override tags (e.g. "no logo", "neutral muted color palette").',
+    'Each run below lists which elements were active, disabled, or overridden — use that as ground truth.',
+    'Rate elements based on whether feedback suggests the model respected them when they were active.',
+    'If an element was disabled via override in all runs, mark it — Disabled.',
+    'Do NOT mark Brand DNA elements as "Not tested" just because no explicit mod tag was added.',
     '',
     'Output EXACTLY this markdown structure, no extra sections:',
     '',
