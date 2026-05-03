@@ -692,20 +692,37 @@ function BrandEditor({ brand: init, onBack, onSave }: {
   const logoRef = useRef<HTMLInputElement>(null);
   const refRef = useRef<HTMLInputElement>(null);
 
-  // Merge extracted colors from logo + refs, dedup, keep up to 6
+  // Logo is the primary color source (up to 5 colors). Reference images only
+  // fill remaining slots (1-2 each) if the logo doesn't saturate the palette.
   const refreshPalette = useCallback(async (logo: string | undefined, refs: ReferenceImage[]) => {
-    const sources = [...(logo ? [logo] : []), ...refs.map(r => r.data)];
-    if (!sources.length) { setPalette([]); return; }
-    const perSource = logo ? 3 : 2;
-    const all: string[] = [];
-    for (const src of sources.slice(0, 4)) {
-      const cols = await extractDominantColors(src, perSource);
-      all.push(...cols);
-    }
-    // Deduplicate by hex value, keep first occurrence
     const seen = new Set<string>();
-    const deduped = all.filter(c => { if (seen.has(c)) return false; seen.add(c); return true; });
-    setPalette(deduped.slice(0, 6));
+    const dedup = (cols: string[]) => cols.filter(c => { if (seen.has(c)) return false; seen.add(c); return true; });
+
+    const all: string[] = [];
+
+    if (logo) {
+      const logoColors = await extractDominantColors(logo, 5);
+      all.push(...dedup(logoColors));
+    }
+
+    // Only pull from refs if logo didn't fill the palette
+    if (all.length < 6) {
+      for (const ref of refs.slice(0, 4)) {
+        if (all.length >= 6) break;
+        const refColors = await extractDominantColors(ref.data, 2);
+        all.push(...dedup(refColors));
+      }
+    }
+
+    if (!all.length && refs.length) {
+      // No logo — fall back to refs as primary
+      for (const ref of refs.slice(0, 3)) {
+        const refColors = await extractDominantColors(ref.data, 2);
+        all.push(...dedup(refColors));
+      }
+    }
+
+    setPalette(all.slice(0, 6));
   }, []);
 
   const handleLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
