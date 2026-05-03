@@ -39,6 +39,8 @@ interface GenerateRequest {
 
 interface DebugInfo {
   fullPrompt: string;
+  cleanPrompt: string;
+  overrideSettings: string[];
   modelCandidates: string[];
   selectedModels: string[];
   analysisModel?: string;
@@ -62,152 +64,79 @@ const FALLBACK_ANALYSIS: CampaignAnalysis = {
   ],
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// STEP 2 — Brand context block
-//
-// Injected before preset + quality when a brand is active.
-// hasLogo / refCount are passed so rules can reference what's actually attached.
-//
-// Priority hierarchy (enforced in text):
-//   1. Explicit Brand DNA fields entered by the user
-//      (logo, palette, voice/tone, brand name) are the source of truth.
-//   2. Reference images fill in missing brand signals:
-//      typography style, formality, layout rhythm, visual tone, materials.
-//   3. User prompt decides the campaign task and which reference details matter.
-//   4. Quality standards raise the technical bar without overriding brand fidelity.
-// ─────────────────────────────────────────────────────────────────────────────
-function buildBrandContext(brand: BrandDNA, hasLogo: boolean, refCount: number): string {
+interface ParsedPrompt {
+  cleanPrompt: string;
+  overrideSettings: string[];
+}
+
+function parsePromptOverrides(prompt: string): ParsedPrompt {
+  const trimmed = prompt.trim();
+  const match = trimmed.match(/(?:\.\s*)?Override settings:\s*([\s\S]*?)\.?\s*$/i);
+  if (!match) return { cleanPrompt: trimmed, overrideSettings: [] };
+
+  const cleanPrompt = trimmed.slice(0, match.index).trim().replace(/[.\s]+$/, '');
+  const overrideSettings = match[1]
+    .split(';')
+    .map(item => item.trim().replace(/[.\s]+$/, ''))
+    .filter(Boolean);
+
+  return { cleanPrompt: cleanPrompt || trimmed, overrideSettings };
+}
+
+function buildBrandSection(brand: BrandDNA | null | undefined): string {
+  if (!brand) {
+    return [
+      'BRAND DNA',
+      '- Brand: none selected',
+      '- Use the user task as the main creative direction.',
+    ].join('\n');
+  }
+
   const lines: string[] = [
-    '╔══════════════════════════════════════════════════════════════╗',
-    `║  BRAND DNA — ${brand.name.toUpperCase().padEnd(48)}║`,
-    '╚══════════════════════════════════════════════════════════════╝',
-    '',
-    `You are a world-class art director and brand photographer working exclusively`,
-    `for "${brand.name}". Every image you produce must be immediately recognizable`,
-    `as belonging to this brand. Brand fidelity is non-negotiable.`,
-    '',
+    'BRAND DNA',
+    `- Brand: ${brand.name}`,
   ];
 
-  // ── Brand identity facts ──────────────────────────────────────
-  lines.push('━━━ BRAND IDENTITY ━━━');
-  lines.push(`  Brand name : ${brand.name}`);
-  if (brand.voice) lines.push(`  Voice & feel: ${brand.voice}`);
+  if (brand.voice) lines.push(`- Voice / tone: ${brand.voice}`);
   if (brand.palette.length) {
-    lines.push('  Color palette (authoritative hex values):');
-    brand.palette.forEach((c, i) => lines.push(`    ${i + 1}. ${c}`));
+    lines.push(`- Palette: ${brand.palette.join(', ')}`);
+    lines.push('- Use this palette as the primary color system for backgrounds, props, wardrobe, surfaces, and lighting accents.');
   }
-  lines.push('');
-
-  // ── Asset inventory ──────────────────────────────────────────
-  lines.push('━━━ ATTACHED BRAND ASSETS ━━━');
-  if (hasLogo) {
-    lines.push('  [LOGO IMAGE ATTACHED] — see the image immediately following this text.');
-    lines.push('  This is the official brand logo. Memorize its exact shape, colors,');
-    lines.push('  proportions, and design details — you will reproduce it accurately.');
-  } else {
-    lines.push('  [No logo attached] — do not invent a logo.');
-  }
-  if (refCount > 0) {
-    lines.push(`  [${refCount} CAMPAIGN REFERENCE IMAGE(S) ATTACHED] — see images following the logo.`);
-    lines.push('  These are per-generation campaign references supplied by the user.');
-    lines.push('  Use them together with the brand identity to create the requested campaign image.');
-  } else {
-    lines.push('  [No reference images] — derive visual style from palette and voice only.');
-  }
-  lines.push('');
-
-  // ── Mandatory brand rules ─────────────────────────────────────
-  lines.push('━━━ BRAND RULES — follow ALL without exception ━━━');
-  lines.push('');
-
-  lines.push('PRIORITY ORDER:');
-  lines.push('  1. Explicit Brand DNA provided by the user comes first: logo, palette,');
-  lines.push('     brand name, and written voice/tone are authoritative.');
-  lines.push('  2. If Brand DNA is vague or incomplete, infer missing brand elements from');
-  lines.push('     the reference images: typography style, degree of formality, layout');
-  lines.push('     rhythm, camera language, graphic density, materials, tone, and mood.');
-  lines.push('  3. Use the user prompt to decide the scene and which reference details are relevant.');
-  lines.push('  4. Never let references contradict explicit Brand DNA unless the user asks.');
-  lines.push('');
-
-  if (hasLogo) {
-    lines.push('LOGO RENDERING:');
-    lines.push('  • The attached logo image is the ground truth — reproduce it faithfully.');
-    lines.push('  • When the scene includes a branded product, package, or surface,');
-    lines.push('    render the logo on it with accurate colors, proportions, and details.');
-    lines.push('  • If the user asks for packaging, ads, banners, social posts, products,');
-    lines.push('    uniforms, storefronts, or branded surfaces, include the logo unless');
-    lines.push('    the user explicitly asks for an unbranded image.');
-    lines.push('  • Do NOT simplify, distort, or reimagine the logo — match it exactly.');
-    lines.push('  • The logo\'s own colors take precedence over the palette in the logo area.');
-    lines.push('  • Logo placement should feel professionally applied — correct perspective,');
-    lines.push('    proper material interaction (e.g. slight surface curvature on bottles).');
-    lines.push('');
-  }
-
-  if (refCount > 0) {
-    lines.push('CAMPAIGN REFERENCE IMAGES:');
-    lines.push('  • These images are user-provided campaign references for THIS generation.');
-    lines.push('  • Use them according to the user prompt: preserve the relevant subject,');
-    lines.push('    pose, product context, composition, lighting, or material cues as requested.');
-    lines.push('  • Study their brand DNA beyond objects: typography style, font weight,');
-    lines.push('    spacing, hierarchy, minimal vs. expressive layout, formal vs. playful');
-    lines.push('    tone, premium vs. casual mood, texture system, and graphic language.');
-    lines.push('  • If the written Brand DNA does not specify typography or tone clearly,');
-    lines.push('    infer those from the references and apply them consistently.');
-    lines.push('  • Do not copy irrelevant objects or accidental details from references.');
-    lines.push('  • Blend the references with the active Brand DNA rather than replacing it.');
-    lines.push('  • The final image must feel like a campaign asset for this brand, informed by');
-    lines.push('    the supplied references and constrained by the brand palette, voice, and logo.');
-    lines.push('');
-  }
-
-  if (brand.palette.length) {
-    lines.push('COLOR PALETTE (second priority after reference images):');
-    lines.push(`  • Dominant palette: ${brand.palette.join(', ')}`);
-    lines.push('  • Treat these as brand color constraints, not loose inspiration.');
-    lines.push('  • Apply these hex values to backgrounds, surfaces, props, wardrobe, lighting gels, packaging, and environment.');
-    lines.push('  • Outside colors may appear only for natural skin, realistic materials, or physically unavoidable context.');
-    lines.push('  • Color temperature and saturation must align with these swatches.');
-    lines.push('');
-  }
-
-  if (brand.voice) {
-    lines.push('BRAND VOICE & ATMOSPHERE:');
-    lines.push(`  • The brand feels: "${brand.voice}"`);
-    lines.push('  • This written voice overrides any conflicting tone inferred from references.');
-    lines.push('  • Let this permeate lighting mood, subject expression, texture, composition.');
-    lines.push('  • A viewer should feel this brand\'s personality without reading any text.');
-    lines.push('');
-  }
-
-  lines.push('GENERAL:');
-  lines.push('  • Do NOT add random text, watermarks, or unsolicited brand names.');
-  lines.push('  • DO render the brand logo when it is part of the requested scene.');
-  lines.push('  • Brand consistency overrides literal prompt interpretation.');
-  lines.push('  • If brand rules and references conflict, follow explicit user Brand DNA first,');
-  lines.push('    then use references to fill missing typography, tone, and style details.');
 
   return lines.join('\n');
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// STEP 3 — Style preset modifier
-//
-// Preset names are shown in the UI for user context only.
-// They are intentionally NOT injected into the prompt — brand DNA + quality
-// standards are the sole generation drivers. Edit this map if you want to
-// re-enable preset prompt injection in buildFullPrompt.
-// ─────────────────────────────────────────────────────────────────────────────
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const PRESET_MODIFIERS: Record<string, string> = {
-  editorial: 'Editorial',
-  product:   'Product',
-  lifestyle: 'Lifestyle',
-  social:    'Social post',
-  banner:    'Web banner',
-  package:   'Packaging',
-};
+function buildAssetsSection(hasLogo: boolean, refCount: number, brand?: BrandDNA | null): string {
+  const lines = ['ASSETS'];
+  lines.push(hasLogo
+    ? `- Logo attached: yes, official logo for ${brand?.name ?? 'the brand'}. Match its shape, colors, proportions, and weight when logo is requested or naturally belongs in the scene.`
+    : '- Logo attached: no. Do not invent a logo unless the user explicitly asks for one.');
+  lines.push(refCount > 0
+    ? `- References attached: ${refCount}. Use them for relevant subject, composition, typography feel, tone, material, layout, and mood.`
+    : '- References attached: none. Infer style from the prompt and Brand DNA only.');
+  return lines.join('\n');
+}
+
+function buildOverrideSection(overrides: string[]): string {
+  const lines = ['OVERRIDE SETTINGS'];
+  if (!overrides.length) {
+    lines.push('- None. Do not apply optional override controls.');
+    return lines.join('\n');
+  }
+  overrides.forEach(item => lines.push(`- ${item}`));
+  lines.push('- These overrides are explicit controls. Respect them unless they directly conflict with the user task.');
+  return lines.join('\n');
+}
+
+function buildOutputStandard(): string {
+  return [
+    'OUTPUT STANDARD',
+    '- Commercial campaign quality with clean hierarchy, coherent lighting, and sharp focal detail.',
+    '- Avoid visual glitches, warped anatomy, random text, watermarks, and accidental extra logos.',
+    '- If text is requested, keep it intentional, minimal, and readable.',
+    '- If the task mentions a product but no product/reference is supplied, represent the brand offering or campaign idea instead of inventing an unrelated physical product.',
+  ].join('\n');
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STEP 4 — Full prompt assembly
@@ -220,33 +149,35 @@ const PRESET_MODIFIERS: Record<string, string> = {
 // Preset is received but not injected — it's a UI label only.
 // ─────────────────────────────────────────────────────────────────────────────
 function buildFullPrompt(
-  userPrompt: string,
+  cleanPrompt: string,
   brand: BrandDNA | null | undefined,
   _preset: string | null | undefined,
   hasLogo: boolean,
   refCount: number,
   analysis: CampaignAnalysis,
+  overrideSettings: string[],
 ): string {
-  const sections: string[] = [];
-
-  if (brand) {
-    sections.push(buildBrandContext(brand, hasLogo, refCount));
-  }
-
-  sections.push(
-    '━━━ CAMPAIGN CLASSIFICATION ━━━\n' +
-    `Campaign type: ${analysis.campaignType}\n` +
-    'Use this classification as lightweight planning context only. Do not override the user prompt or explicit Brand DNA.'
-  );
-
-  sections.push(
-    '━━━ GENERATION TASK ━━━\n' +
-    'Apply the Brand DNA, user prompt, and attached references with commercial-quality composition and realistic detail.\n\n' +
-    'Generate: ' + userPrompt.trim() + '\n\n' +
-    'This output should be publication-ready, brand-faithful, and free of unintended artifacts or unsolicited text.'
-  );
-
-  return sections.join('\n\n');
+  return [
+    'USER TASK',
+    cleanPrompt.trim(),
+    '',
+    'CAMPAIGN TYPE',
+    analysis.campaignType,
+    '',
+    buildBrandSection(brand),
+    '',
+    buildAssetsSection(hasLogo, refCount, brand),
+    '',
+    buildOverrideSection(overrideSettings),
+    '',
+    'GENERATION DIRECTION',
+    '- User task defines the scene and goal.',
+    '- Brand DNA defines the visual identity, tone, and color system.',
+    '- Attached logo and references are grounding assets, not optional decoration.',
+    '- Campaign type is planning context only; do not let it override the user task.',
+    '',
+    buildOutputStandard(),
+  ].join('\n');
 }
 
 async function analyzeCampaign(
@@ -302,18 +233,19 @@ async function analyzeCampaign(
 //
 // Interleave labeled text before each image so the model understands the ROLE
 // of each image before processing it. Order:
-//   1. Full text prompt (brand context + preset + quality + task)
+//   1. Full text prompt (task + campaign type + brand + assets + overrides)
 //   2. [label] "BRAND LOGO" + logo inlineData
 //   3. [label] "REFERENCE IMAGE N of M" + ref inlineData (up to 5)
-//   4. [task reinforcement] — re-states scene + quality bar after all images
+//   4. [task reinforcement] — re-states task after all images
 //
 // The label-before-image pattern is the key to reliable multi-image grounding.
 // ─────────────────────────────────────────────────────────────────────────────
 function buildApiParts(
   promptText: string,
-  userPrompt: string,
+  cleanPrompt: string,
   referenceImages: RefImage[],
   brand: BrandDNA | null | undefined,
+  overrideSettings: string[],
   logoImage?: RefImage,
 ): object[] {
   const parts: object[] = [{ text: promptText }];
@@ -352,7 +284,7 @@ function buildApiParts(
   const reinforcement: string[] = [
     '[FINAL TASK — generate now]',
     `You have studied all brand assets. Now produce a publication-quality image of:\n`,
-    `"${userPrompt.trim()}"`,
+    `"${cleanPrompt.trim()}"`,
     '',
   ];
   if (logoImage) {
@@ -368,9 +300,12 @@ function buildApiParts(
       `layout, material, and art-direction details.`
     );
   }
+  if (overrideSettings.length > 0) {
+    reinforcement.push(`OVERRIDES: ${overrideSettings.join('; ')}.`);
+  }
   reinforcement.push(
-    `QUALITY: Photorealistic, tack-sharp, full dynamic range, no AI artifacts. ` +
-    `Commercial photography standard. This must be campaign-ready.`
+    `STANDARD: clean campaign-quality composition, coherent lighting, sharp focal detail, ` +
+    `no visual glitches, no accidental extra text, no watermarks.`
   );
 
   parts.push({ text: reinforcement.join('\n') });
@@ -462,13 +397,16 @@ export async function POST(req: NextRequest) {
 
   const hasLogo = !!logoImage;
   const refCount = Math.min(referenceImages.length, 5);
-  const analysis = await analyzeCampaign(apiKey, prompt.trim(), brand, refCount, hasLogo);
+  const { cleanPrompt, overrideSettings } = parsePromptOverrides(prompt);
+  const analysis = await analyzeCampaign(apiKey, cleanPrompt, brand, refCount, hasLogo);
 
   // Build parts once — reused for both parallel generation calls
-  const fullPrompt = buildFullPrompt(prompt.trim(), brand, preset, hasLogo, refCount, analysis);
-  const parts = buildApiParts(fullPrompt, prompt.trim(), referenceImages, brand, logoImage);
+  const fullPrompt = buildFullPrompt(cleanPrompt, brand, preset, hasLogo, refCount, analysis, overrideSettings);
+  const parts = buildApiParts(fullPrompt, cleanPrompt, referenceImages, brand, overrideSettings, logoImage);
   const debug: DebugInfo = {
     fullPrompt,
+    cleanPrompt,
+    overrideSettings,
     modelCandidates: IMAGE_GENERATION_MODELS,
     selectedModels: [],
     analysisModel: TEXT_ANALYSIS_MODEL,

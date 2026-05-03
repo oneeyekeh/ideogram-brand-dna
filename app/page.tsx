@@ -127,10 +127,10 @@ function Icon({ name, size = 16, stroke = 1.6 }: { name: string; size?: number; 
 // ── Static data ───────────────────────────────────────────────────────────────
 
 const DEFAULT_BRANDS: Brand[] = [
-  { id: 'foundry', name: 'Foundry Coffee', logoText: 'Foundry', palette: ['#3D1F12','#C97A3A','#E9D5B5','#F5EBDB'], voice: 'Earthy, crafted, slow.', edited: '2d ago', keywords: ['warm grain','matte ceramic','shadow play'], samples: ['grad-1','grad-3','grad-9'] },
-  { id: 'aria', name: 'Aria Skincare', logoText: 'aria', palette: ['#F5E6D3','#E8C5A0','#A87856','#3F2A1E'], voice: 'Soft, considered, luminous.', edited: '5h ago', keywords: ['diffused light','milky beige','glassy'], samples: ['grad-6','grad-2','grad-11'] },
-  { id: 'monsoon', name: 'Monsoon Tech', logoText: 'Monsoon', palette: ['#0F1F3A','#4A90E2','#8FB8E8','#FFFFFF'], voice: 'Confident, calm, technical.', edited: 'last week', keywords: ['cool gradients','blue glass','clean type'], samples: ['grad-7','grad-12','grad-4'] },
-  { id: 'plume', name: 'Plume Studio', logoText: 'Plume', palette: ['#FFE5EC','#FF7AA2','#5B1339','#FFFFFF'], voice: 'Playful, bold, expressive.', edited: '3d ago', keywords: ['soft pinks','high contrast','paper textures'], samples: ['grad-2','grad-5','grad-8'] },
+  { id: 'foundry', name: 'Foundry Coffee', logoText: 'Foundry', logoImage: 'data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%233D1F12%22%2F%3E%3Cpath%20d%3D%22M20%2022h24v11c0%208-5%2014-12%2014S20%2041%2020%2033V22z%22%20fill%3D%22%23E9D5B5%22%2F%3E%3Cpath%20d%3D%22M44%2027h4a6%206%200%200%201%200%2012h-4%22%20fill%3D%22none%22%20stroke%3D%22%23E9D5B5%22%20stroke-width%3D%224%22%2F%3E%3Cpath%20d%3D%22M25%2018c0-4%204-4%204-8M35%2018c0-4%204-4%204-8%22%20stroke%3D%22%23C97A3A%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E', palette: ['#3D1F12','#C97A3A','#E9D5B5','#F5EBDB'], voice: 'Earthy, crafted, slow.', edited: '2d ago', keywords: ['warm grain','matte ceramic','shadow play'], samples: ['grad-1','grad-3','grad-9'] },
+  { id: 'aria', name: 'Aria Skincare', logoText: 'aria', logoImage: 'data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2218%22%20fill%3D%22%23F5E6D3%22%2F%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2218%22%20fill%3D%22%23E8C5A0%22%2F%3E%3Cpath%20d%3D%22M32%2016c8%208%208%2024%200%2032-8-8-8-24%200-32z%22%20fill%3D%22%23A87856%22%2F%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%226%22%20fill%3D%22%233F2A1E%22%2F%3E%3C%2Fsvg%3E', palette: ['#F5E6D3','#E8C5A0','#A87856','#3F2A1E'], voice: 'Soft, considered, luminous.', edited: '5h ago', keywords: ['diffused light','milky beige','glassy'], samples: ['grad-6','grad-2','grad-11'] },
+  { id: 'monsoon', name: 'Monsoon Tech', logoText: 'Monsoon', logoImage: 'data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%230F1F3A%22%2F%3E%3Cpath%20d%3D%22M18%2038c8-18%2020-18%2028%200%22%20fill%3D%22none%22%20stroke%3D%22%238FB8E8%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22%2F%3E%3Cpath%20d%3D%22M20%2044h24%22%20stroke%3D%22%234A90E2%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22%2F%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2227%22%20r%3D%226%22%20fill%3D%22%23FFFFFF%22%2F%3E%3C%2Fsvg%3E', palette: ['#0F1F3A','#4A90E2','#8FB8E8','#FFFFFF'], voice: 'Confident, calm, technical.', edited: 'last week', keywords: ['cool gradients','blue glass','clean type'], samples: ['grad-7','grad-12','grad-4'] },
+  { id: 'plume', name: 'Plume Studio', logoText: 'Plume', logoImage: 'data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2216%22%20fill%3D%22%235B1339%22%2F%3E%3Cpath%20d%3D%22M18%2038c14-2%2024-10%2028-24%204%2018-5%2032-24%2034%22%20fill%3D%22%23FF7AA2%22%2F%3E%3Cpath%20d%3D%22M24%2046c5-12%2013-20%2024-27%22%20stroke%3D%22%23FFE5EC%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E', palette: ['#FFE5EC','#FF7AA2','#5B1339','#FFFFFF'], voice: 'Playful, bold, expressive.', edited: '3d ago', keywords: ['soft pinks','high contrast','paper textures'], samples: ['grad-2','grad-5','grad-8'] },
 ];
 
 interface PromptPreset {
@@ -173,7 +173,7 @@ type BrandingModState = Record<string, boolean | null>;
 
 const BRANDING_MODS: BrandingMod[] = [
   { id: 'logo',        label: 'Logo',          onLabel: 'Logo visible',    offLabel: 'No logo',          onTag: 'logo accurately rendered and visible',        offTag: 'no logo',                     defaultOn: false },
-  { id: 'text',        label: 'Text',          onLabel: 'With text',       offLabel: 'No text',          onTag: 'brand name as text element in composition',   offTag: 'no text',                     defaultOn: false },
+  { id: 'text',        label: 'Text',          onLabel: 'Text allowed',    offLabel: 'No text',          onTag: 'intentional creative or campaign text allowed when useful', offTag: 'no text',                     defaultOn: false },
   { id: 'brandColors', label: 'Brand palette', onLabel: 'Brand palette',   offLabel: 'Neutral palette',  onTag: 'brand colors dominant throughout scene',      offTag: 'neutral muted color palette', defaultOn: true  },
   { id: 'person',      label: 'Person',        onLabel: 'With person',     offLabel: 'No people',        onTag: 'person in scene',                            offTag: 'no people in frame',          defaultOn: false },
   { id: 'face',        label: 'Face',          onLabel: 'Face visible',    offLabel: 'Face hidden',      onTag: 'face clearly visible',                        offTag: 'no face visible, hands or back only', defaultOn: false },
@@ -295,7 +295,12 @@ function extractDominantColors(dataURL: string, count = 10): Promise<string[]> {
 function dataURLtoBase64(dataURL: string) {
   const [header, data] = dataURL.split(',');
   const mimeType = header.match(/:(.*?);/)?.[1] ?? 'image/jpeg';
-  return { data, mimeType };
+  if (header.includes(';base64')) return { data, mimeType };
+  const decoded = decodeURIComponent(data ?? '');
+  const encoded = typeof window === 'undefined'
+    ? data
+    : window.btoa(unescape(encodeURIComponent(decoded)));
+  return { data: encoded, mimeType };
 }
 
 function createGenerationTrace(
@@ -325,6 +330,8 @@ function formatDebugMarkdown(
   refs: AttachedImage[],
   debug: {
     fullPrompt?: string;
+    cleanPrompt?: string;
+    overrideSettings?: string[];
     modelCandidates?: string[];
     selectedModels?: string[];
     analysisModel?: string;
@@ -355,8 +362,11 @@ function formatDebugMarkdown(
     '',
     '## User Prompt',
     '```text',
-    prompt,
+    debug?.cleanPrompt ?? prompt,
     '```',
+    '',
+    '## Override Settings',
+    ...(debug?.overrideSettings?.length ? debug.overrideSettings.map(item => `- ${item}`) : ['- none']),
     '',
     '## Brand DNA Input',
     `- Brand: ${brand?.name ?? 'none'}`,
@@ -1036,58 +1046,59 @@ function BrandsPage({ brands, activeBrand, setActiveBrand, onCreate, onEdit }: {
   onCreate: () => void; onEdit: (b: Brand) => void;
 }) {
   return (
-    <>
-      <div className="page-head">
-        <h1 className="page-h1">My <em>Brand DNA</em></h1>
-        <p className="page-sub">Pick a brand to apply it to every generation.</p>
+    <div className="elements-page">
+      <h1 className="elements-title">Elements</h1>
+
+      <div className="elements-tabs" aria-label="Element type">
+        <button>Models</button>
+        <button>Styles</button>
+        <button className="active">Brand DNA</button>
+        <button>Characters</button>
       </div>
-      <div className="page-content">
-        {/* Compact mini-card grid */}
-        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:10}}>
-          {brands.map(b => {
-            const isActive = activeBrand === b.id;
-            return (
-              <div key={b.id}
-                onClick={() => setActiveBrand(isActive ? null : b.id)}
-                style={{
-                  background: isActive ? 'var(--accent-soft)' : 'var(--bg-1)',
-                  border:`1px solid ${isActive?'var(--accent)':'var(--line)'}`,
-                  borderRadius:12, padding:'12px 14px', cursor:'pointer', transition:'all 0.15s',
-                }}>
-                {/* Palette bar */}
-                <div style={{height:5, borderRadius:100, overflow:'hidden', display:'flex', marginBottom:10}}>
-                  {b.palette.map((c,i) => <span key={i} style={{flex:1, background:c}}/>)}
+
+      <div className="element-card-grid">
+        <button className="element-create-card" onClick={onCreate}>
+          <Icon name="plus" size={24}/>
+        </button>
+
+        {brands.map(b => {
+          const isActive = activeBrand === b.id;
+          return (
+            <div
+              key={b.id}
+              className={`element-brand-card ${isActive ? 'active' : ''}`}
+              onClick={() => setActiveBrand(isActive ? null : b.id)}
+            >
+              <div className="element-brand-art">
+                <div
+                  className="element-gradient-preview"
+                  style={{
+                    background: `linear-gradient(135deg, ${b.palette[0] ?? '#222'} 0%, ${b.palette[1] ?? b.palette[0] ?? '#333'} 45%, ${b.palette[2] ?? b.palette[1] ?? '#555'} 100%)`,
+                  }}
+                />
+                <div className="element-logo-chip">
+                  {b.logoImage ? <img src={b.logoImage} alt="" /> : <span>{b.logoText?.slice(0, 1) || b.name.slice(0, 1)}</span>}
                 </div>
-                {/* Name row */}
-                <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:6}}>
-                  <div>
-                    <div style={{fontSize:13, fontWeight:500, color:'var(--text-1)', display:'flex', alignItems:'center', gap:5}}>
-                      {isActive && <Icon name="check" size={11}/>}
-                      {b.name}
-                    </div>
-                    {b.voice && <div style={{fontSize:11, color:'var(--text-3)', marginTop:2, lineHeight:1.3}}>{b.voice}</div>}
-                  </div>
-                  <button className="btn-icon" style={{flexShrink:0}}
-                    onClick={e=>{e.stopPropagation(); onEdit(b);}}>
-                    <Icon name="edit" size={12}/>
-                  </button>
-                </div>
+                {isActive && <div className="element-status">Active</div>}
               </div>
-            );
-          })}
-          {/* Add new */}
-          <button onClick={onCreate}
-            style={{background:'transparent', border:'1.5px dashed var(--line-2)', borderRadius:12,
-              padding:'12px 14px', cursor:'pointer', transition:'all 0.15s',
-              display:'flex', alignItems:'center', gap:8, color:'var(--text-3)', minHeight:72}}
-            onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor='var(--accent)';(e.currentTarget as HTMLElement).style.color='var(--accent-text)';}}
-            onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor='var(--line-2)';(e.currentTarget as HTMLElement).style.color='var(--text-3)';}}>
-            <Icon name="plus" size={16}/>
-            <span style={{fontSize:12, fontWeight:500}}>New brand</span>
-          </button>
-        </div>
+              <div className="element-card-meta">
+                <div>
+                  <div className="element-card-name">{b.name}</div>
+                  <div className="element-card-sub">{b.voice || 'No voice set'}</div>
+                </div>
+                <button
+                  className="element-card-edit"
+                  onClick={e=>{e.stopPropagation(); onEdit(b);}}
+                  aria-label={`Edit ${b.name}`}
+                >
+                  <Icon name="edit" size={13}/>
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
-    </>
+    </div>
   );
 }
 
