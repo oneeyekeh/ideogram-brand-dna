@@ -134,104 +134,26 @@ interface PromptPreset {
   id: string;
   category: string;
   label: string;
-  description: string;
-  prompt_template: string;
+  prompt: string;
 }
 
 const PRESET_CATEGORIES = ['Social Media', 'Product', 'Campaign', 'Brand Storytelling'];
 
 const PROMPT_SUGGESTIONS: PromptPreset[] = [
-  {
-    id: 'instagram_feed',
-    category: 'Social Media',
-    label: 'Instagram Feed Post',
-    description: 'Square, scroll-stopping product shot for the feed',
-    prompt_template: 'Square format lifestyle product shot of {product}, clean composition, brand colors {colors} prominent, styled and polished, natural light, Instagram editorial aesthetic, no text',
-  },
-  {
-    id: 'instagram_story',
-    category: 'Social Media',
-    label: 'Instagram Story / Reel Cover',
-    description: 'Vertical format, bold crop, space for text overlay',
-    prompt_template: 'Vertical 9:16 product image of {product}, bold graphic composition, subject in lower third, top half open and negative space for text overlay, brand colors {colors}, lifestyle feel',
-  },
-  {
-    id: 'facebook_cover',
-    category: 'Social Media',
-    label: 'Facebook Event Cover',
-    description: 'Wide horizontal, energetic, promotion or event feel',
-    prompt_template: 'Wide horizontal 16:9 promotional image featuring {product}, energetic and inviting atmosphere, brand colors {colors}, event or campaign feel, no text',
-  },
-  {
-    id: 'product_hero',
-    category: 'Product',
-    label: 'Clean Product Hero',
-    description: 'Isolated product, studio lighting, no distractions',
-    prompt_template: 'Professional studio product shot of {product}, isolated on clean simple background, soft studio lighting, sharp detail, brand colors {colors}, no text, commercial photography',
-  },
-  {
-    id: 'product_in_use',
-    category: 'Product',
-    label: 'Product In Use',
-    description: 'Someone naturally using or holding the product',
-    prompt_template: 'Candid lifestyle photo of a person naturally using or holding {product}, authentic moment, soft natural light, brand colors {colors} present in scene, shallow depth of field, no text',
-  },
-  {
-    id: 'product_flatlay',
-    category: 'Product',
-    label: 'Product Flat Lay',
-    description: 'Top-down arranged shot with complementary props',
-    prompt_template: 'Overhead flat lay of {product} with complementary styled props on a clean surface, top-down angle, editorial composition, brand colors {colors}, natural light, no text',
-  },
-  {
-    id: 'product_apparel',
-    category: 'Product',
-    label: 'Apparel / Wearable Shot',
-    description: 'Clothing or accessory on model or mannequin',
-    prompt_template: 'Fashion editorial shot of {product} worn by a model, clean studio or lifestyle background, full body or half body, brand colors {colors}, professional lighting, no text',
-  },
-  {
-    id: 'sale_promo',
-    category: 'Campaign',
-    label: 'Sale / Promo',
-    description: 'Bold, high-energy, space for price or offer text',
-    prompt_template: 'Bold promotional product image of {product}, high energy composition, vibrant brand colors {colors}, product as hero, generous negative space for text overlay, commercial and eye-catching, no text',
-  },
-  {
-    id: 'seasonal',
-    category: 'Campaign',
-    label: 'Seasonal Moment',
-    description: 'Product tied to a season or holiday with atmosphere',
-    prompt_template: 'Seasonal lifestyle image of {product} in a {season} setting, contextual atmosphere and props that match the season, brand colors {colors} woven into scene, warm and editorial, no text',
-  },
-  {
-    id: 'new_arrival',
-    category: 'Campaign',
-    label: 'New Arrival / Launch',
-    description: 'Fresh, exciting, product as the undisputed hero',
-    prompt_template: 'Premium launch image of {product}, fresh and exciting composition, product as absolute hero, clean and elevated aesthetic, brand colors {colors}, sense of newness and quality, no text',
-  },
-  {
-    id: 'behind_scenes',
-    category: 'Brand Storytelling',
-    label: 'Behind the Scenes',
-    description: 'Craft, process, workspace — human and authentic',
-    prompt_template: 'Behind the scenes photo of {product} being made or prepared, hands at work, craft and process visible, warm authentic light, brand colors {colors} present naturally in environment, documentary feel, no text',
-  },
-  {
-    id: 'lifestyle_aspirational',
-    category: 'Brand Storytelling',
-    label: 'Lifestyle / Aspirational',
-    description: 'Sells the feeling and world around the brand',
-    prompt_template: 'Aspirational lifestyle image that evokes the world of {brand}, no hard product focus, atmosphere and feeling over literal product, brand colors {colors}, editorial and evocative, no text',
-  },
-  {
-    id: 'customer_moment',
-    category: 'Brand Storytelling',
-    label: 'Customer Moment',
-    description: 'Real-feeling scene of someone enjoying the product',
-    prompt_template: 'Warm candid lifestyle photo of a happy customer enjoying {product}, relatable and authentic scene, natural light, brand colors {colors} present in environment, genuine and human, no text',
-  },
+  { id: 'instagram_feed', category: 'Social Media', label: 'Instagram Feed Post', prompt: 'Square lifestyle product shot, styled and polished, scroll-stopping composition, no text' },
+  { id: 'instagram_story', category: 'Social Media', label: 'Instagram Story / Reel Cover', prompt: 'Vertical 9:16, subject in lower third, top half open for text overlay, no text' },
+  { id: 'facebook_cover', category: 'Social Media', label: 'Facebook Event Cover', prompt: 'Wide horizontal 16:9, energetic and inviting, event or promotion feel, no text' },
+  { id: 'product_hero', category: 'Product', label: 'Clean Product Hero', prompt: 'Isolated product on clean background, professional studio lighting, sharp detail, no text' },
+  { id: 'product_in_use', category: 'Product', label: 'Product In Use', prompt: 'Person naturally using or holding the product, candid and authentic, shallow depth of field, no text' },
+  { id: 'product_flatlay', category: 'Product', label: 'Product Flat Lay', prompt: 'Overhead top-down arrangement, product with complementary props on a clean surface, editorial composition, no text' },
+  { id: 'product_apparel', category: 'Product', label: 'Apparel / Wearable on Model', prompt: 'Clothing or accessory worn by a model, full or half body, clean background, no text' },
+  { id: 'product_shoe_bag', category: 'Product', label: 'Shoe / Bag Hero', prompt: 'Single accessory product shot, side or three-quarter angle, surface with texture, dramatic lighting, no text' },
+  { id: 'sale_promo', category: 'Campaign', label: 'Sale / Promo', prompt: 'Bold high-energy composition, product as hero, generous negative space for text overlay, no text' },
+  { id: 'seasonal', category: 'Campaign', label: 'Seasonal / Holiday', prompt: 'Product in a seasonal setting with contextual atmosphere and props, warm and editorial, no text' },
+  { id: 'new_arrival', category: 'Campaign', label: 'New Arrival / Launch', prompt: 'Product as absolute hero, clean elevated composition, sense of newness and premium quality, no text' },
+  { id: 'behind_scenes', category: 'Brand Storytelling', label: 'Behind the Scenes', prompt: 'Hands at work, craft or process visible, documentary feel, authentic and human, no text' },
+  { id: 'lifestyle_aspirational', category: 'Brand Storytelling', label: 'Lifestyle / Aspirational', prompt: 'Atmosphere and feeling over literal product, editorial and evocative, no hard product focus, no text' },
+  { id: 'customer_moment', category: 'Brand Storytelling', label: 'Customer Moment', prompt: 'Candid scene of a happy customer enjoying the product, warm and relatable, genuine and human, no text' },
 ];
 
 const GALLERY_IMAGES = [
@@ -852,13 +774,9 @@ function ExploreResults({ stream, onRegenerate, onRefine, onOpenDetail, debugDoc
 
 // ── Prompt section (inline, replaces gallery) ────────────────────────────────
 
-function PromptSection({ onSelect, onBack }: { onSelect: (p: string) => void; onBack: () => void }) {
+function PromptSection({ onSelect }: { onSelect: (p: string) => void }) {
   return (
     <div style={{marginTop: 32, animation: 'fadeSlideUp 0.22s ease both'}}>
-      <div className="sec-head" style={{marginTop: 0, marginBottom: 28}}>
-        <h2>Prompt <em>presets</em></h2>
-        <button className="more" onClick={onBack}>← Explore</button>
-      </div>
       {PRESET_CATEGORIES.map(cat => {
         const items = PROMPT_SUGGESTIONS.filter(s => s.category === cat);
         return (
@@ -870,9 +788,8 @@ function PromptSection({ onSelect, onBack }: { onSelect: (p: string) => void; on
             </div>
             <div className="ps-grid">
               {items.map(s => (
-                <button key={s.id} className="ps-card" onClick={() => onSelect(s.prompt_template)}>
-                  <p className="ps-text">{s.label}</p>
-                  <p className="ps-desc">{s.description}</p>
+                <button key={s.id} className="ps-card" onClick={() => onSelect(s.prompt)}>
+                  <p className="ps-text">{s.prompt}</p>
                 </button>
               ))}
             </div>
@@ -964,9 +881,9 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
         {PRESET_CATEGORIES.slice(0, 3).map(cat => {
           const s = PROMPT_SUGGESTIONS.find(p => p.category === cat)!;
           return (
-            <button key={cat} className="prompt-chip" onClick={() => setPrompt(s.prompt_template)}>
+            <button key={cat} className="prompt-chip" onClick={() => setPrompt(s.prompt)}>
               <span className="chip-cat">{cat}</span>
-              <span className="chip-text">{s.label}</span>
+              <span className="chip-text">{s.prompt.length > 38 ? s.prompt.slice(0, 36) + '…' : s.prompt}</span>
             </button>
           );
         })}
@@ -975,7 +892,7 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
         </button>
       </div>
       {showGallery
-        ? <PromptSection onSelect={p => setPrompt(p)} onBack={() => setShowGallery(false)}/>
+        ? <PromptSection onSelect={p => setPrompt(p)}/>
         : <ExploreGallery/>
       }
     </div>

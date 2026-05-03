@@ -104,8 +104,8 @@ input, textarea { font: inherit; color: inherit; background: none; border: none;
 .ps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; align-items: start; }
 .ps-card { text-align: left; background: var(--bg-1); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px 18px; cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; gap: 5px; }
 .ps-card:hover { border-color: var(--line-2); background: #141418; transform: translateY(-1px); }
-.ps-text { font-family: var(--serif); font-style: italic; font-size: 20px; line-height: 1.25; color: var(--text-1); letter-spacing: -0.01em; }
-.ps-desc { font-size: 12px; color: var(--text-3); line-height: 1.4; }
+.ps-text { font-family: var(--serif); font-style: italic; font-size: 20px; line-height: 1.3; color: var(--text-2); letter-spacing: -0.01em; }
+.ps-card:hover .ps-text { color: var(--text-1); }
 .explore-gallery-grid { column-count: 4; column-gap: 10px; }
 .gallery-image { display: inline-block; width: 100%; margin: 0 0 10px; border-radius: 12px; cursor: pointer; transition: transform 0.18s; border: 1px solid var(--line); overflow: hidden; background: var(--bg-1); break-inside: avoid; transform-origin: center; }
 .gallery-image img { width: 100%; height: auto; display: block; }
