@@ -28,6 +28,7 @@ interface StreamMessage {
   loading?: boolean;
   images?: string[];
   prompt?: string;
+  ratio?: string;
   attachedImages?: string[];
   referenceImages?: AttachedImage[];
   error?: string;
@@ -605,11 +606,11 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
           )}
         </div>}
 
-        {/* Fake display pills */}
+        {/* Display pills */}
         {!compact && <>
           <span className="tool-pill-display"><Icon name="sparkle" size={10}/> 3.0</span>
           <span className="tool-pill-display"><Icon name="image2" size={10}/> 2</span>
-          <span className="tool-pill-display"><Icon name="ratio" size={10}/> 1:1</span>
+          <span className="tool-pill-display"><Icon name="ratio" size={10}/> Auto</span>
         </>}
 
         {/* More settings */}
@@ -1089,7 +1090,8 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
             <Composer value={prompt} setValue={setPrompt} onSend={onSend}
               brand={brand} setActiveBrand={setActiveBrand} brands={brands}
               activePreset={activePreset} setPreset={setPreset}
-              openCreateBrand={openCreateBrand} attached={attached} setAttached={setAttached} compact hideBrandPicker/>
+              openCreateBrand={openCreateBrand} attached={attached} setAttached={setAttached}
+              compact hideBrandPicker/>
           </div>
         </div>
 
@@ -1112,18 +1114,10 @@ function ExplorePage({ brand, brands, activeBrand, setActiveBrand, prompt, setPr
         brand={brand} setActiveBrand={setActiveBrand} brands={brands}
         activePreset={activePreset} setPreset={setPreset}
         openCreateBrand={openCreateBrand} attached={attached} setAttached={setAttached}/>
-      <div className="prompt-chips">
-        {PRESET_CATEGORIES.slice(0, 3).map(cat => {
-          const s = PROMPT_SUGGESTIONS.find(p => p.category === cat)!;
-          return (
-            <button key={cat} className="prompt-chip" onClick={() => setPrompt(s.prompt)}>
-              <span className="chip-cat">{cat}</span>
-              <span className="chip-text">{s.prompt.length > 38 ? s.prompt.slice(0, 36) + '…' : s.prompt}</span>
-            </button>
-          );
-        })}
-        <button className="prompt-chip prompt-chip-more" onClick={() => setShowGallery(v => !v)}>
-          {showGallery ? '← Gallery' : 'All presets →'}
+      <div className="explore-section-bar">
+        <span className="explore-section-label">{showGallery ? 'Prompt presets' : 'Explore creations'}</span>
+        <button className="explore-section-toggle" onClick={() => setShowGallery(v => !v)}>
+          {showGallery ? 'Explore creations' : 'Prompt presets'}
         </button>
       </div>
       {showGallery
@@ -1644,7 +1638,7 @@ export default function App() {
   }, [stream, imageFeedback, viewingSessionId, setSessions]);
 
   const generateImages = useCallback(async (
-    userPrompt: string, msgIdx: number, attachedRefs: AttachedImage[]
+    userPrompt: string, msgIdx: number, attachedRefs: AttachedImage[], imageRatio?: string
   ) => {
     const currentBrand = brands.find(b => b.id === activeBrand) ?? null;
 
@@ -1663,6 +1657,7 @@ export default function App() {
           referenceImages: refImages,
           logoImage: logoData,
           preset: activePreset,
+          ratio: imageRatio ?? '1:1',
         }),
       });
 
@@ -1672,13 +1667,15 @@ export default function App() {
         const debugMarkdown = formatDebugMarkdown(userPrompt, currentBrand, attachedRefs, json.debug, message);
         setStream(prev => {
           const next = [...prev];
-          const prevTrace = next[msgIdx]?.trace;
+          const prevMsg = next[msgIdx];
+          const prevTrace = prevMsg?.trace;
           next[msgIdx] = {
             role: 'asst',
             images: [],
             prompt: userPrompt,
+            ratio: prevMsg?.ratio,
             referenceImages: attachedRefs,
-            variant: next[msgIdx]?.variant,
+            variant: prevMsg?.variant,
             error: message,
             trace: {
               ...(prevTrace ?? createGenerationTrace(userPrompt, currentBrand, attachedRefs, 'generate', 'error')),
@@ -1714,13 +1711,15 @@ export default function App() {
       ].slice(0, 40));
       setStream(prev => {
         const next = [...prev];
-        const prevTrace = next[msgIdx]?.trace;
+        const prevMsg = next[msgIdx];
+        const prevTrace = prevMsg?.trace;
         next[msgIdx] = {
           role: 'asst',
           images: cappedImages,
           prompt: userPrompt,
+          ratio: prevMsg?.ratio,
           referenceImages: attachedRefs,
-          variant: next[msgIdx]?.variant,
+          variant: prevMsg?.variant,
           trace: prevTrace
             ? { ...prevTrace, status: 'complete', modelName, campaignType, decisionLog, debugMarkdown }
             : { ...createGenerationTrace(userPrompt, currentBrand, attachedRefs, 'generate', 'complete'), modelName, campaignType, decisionLog, debugMarkdown },
@@ -1732,13 +1731,15 @@ export default function App() {
       const debugMarkdown = formatDebugMarkdown(userPrompt, currentBrand, attachedRefs, undefined, message);
       setStream(prev => {
         const next = [...prev];
-        const prevTrace = next[msgIdx]?.trace;
+        const prevMsg = next[msgIdx];
+        const prevTrace = prevMsg?.trace;
         next[msgIdx] = {
           role: 'asst',
           images: [],
           prompt: userPrompt,
+          ratio: prevMsg?.ratio,
           referenceImages: attachedRefs,
-          variant: next[msgIdx]?.variant,
+          variant: prevMsg?.variant,
           error: message,
           trace: prevTrace
             ? { ...prevTrace, status: 'error', debugMarkdown }
@@ -1779,12 +1780,13 @@ export default function App() {
   const handleRegenerate = useCallback((msg: StreamMessage) => {
     if (!msg.prompt) return;
     const refs = msg.referenceImages ?? [];
+    const msgRatio = msg.ratio ?? '1:1';
     setStream(prev => {
       const userMsg: StreamMessage = { role: 'user', text: '↺ Regenerate', variant: 'regen' };
-      const loadingMsg: StreamMessage = { role: 'asst', loading: true, variant: 'regen', trace: createGenerationTrace(msg.prompt!, brand, refs, 'regenerate') };
+      const loadingMsg: StreamMessage = { role: 'asst', loading: true, ratio: msgRatio, variant: 'regen', trace: createGenerationTrace(msg.prompt!, brand, refs, 'regenerate') };
       const next = [...prev, userMsg, loadingMsg];
       const idx = next.length - 1;
-      setTimeout(() => generateImages(msg.prompt!, idx, refs), 0);
+      setTimeout(() => generateImages(msg.prompt!, idx, refs, msgRatio), 0);
       return next;
     });
   }, [brand, generateImages]);
@@ -1798,6 +1800,7 @@ export default function App() {
     const feedback = [issues, changes, focus, notes].filter(Boolean).join(' ');
     const refinedPrompt = `${msg.prompt}\n\nREFINEMENT REQUEST: The previous generation had problems. ${feedback} Please generate a significantly improved version that fixes these specific issues while maintaining full brand DNA compliance.`;
     const refs = msg.referenceImages ?? [];
+    const msgRatio = msg.ratio ?? '1:1';
 
     setStream(prev => {
       const parts = [state.q1, state.q2, state.q3].flat().filter(Boolean);
@@ -1805,10 +1808,10 @@ export default function App() {
       const labelParts = [recentCampaign, ...parts].filter(Boolean);
       const label = labelParts.slice(0, 4).join(' · ') || 'Refinement';
       const userMsg: StreamMessage = { role: 'user', text: `✦ Refine: ${label}`, variant: 'refine' };
-      const loadingMsg: StreamMessage = { role: 'asst', loading: true, variant: 'refine', trace: createGenerationTrace(refinedPrompt, brand, refs, 'refine') };
+      const loadingMsg: StreamMessage = { role: 'asst', loading: true, ratio: msgRatio, variant: 'refine', trace: createGenerationTrace(refinedPrompt, brand, refs, 'refine') };
       const next = [...prev, userMsg, loadingMsg];
       const idx = next.length - 1;
-      setTimeout(() => generateImages(refinedPrompt, idx, refs), 0);
+      setTimeout(() => generateImages(refinedPrompt, idx, refs, msgRatio), 0);
       return next;
     });
   }, [brand, generateImages]);
