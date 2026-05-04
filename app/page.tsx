@@ -685,9 +685,9 @@ function ExploreGallery() {
 
 // ── Refine questionnaire ──────────────────────────────────────────────────────
 
-const REFINE_Q1 = ['Colors off','Lighting / mood','Logo wrong','Composition','Style','Quality'];
-const REFINE_Q2 = ['More contrast','Darker','Brighter','Warmer','Cooler','Different angle','More minimal','More dramatic'];
-const REFINE_Q3 = ['Background','Subject','Logo','Color grade','Atmosphere','Textures'];
+const REFINE_Q1 = ['Logo not visible', 'Brand colors off', 'Wrong mood', 'Composition off', 'Subject unclear', 'Poor quality', 'Face not visible', 'Background wrong'];
+const REFINE_Q2 = ['Stronger brand colors', 'Logo more prominent', 'Darker / moodier', 'Brighter / cleaner', 'More lifestyle', 'More studio / minimal', 'Different angle', 'Higher fidelity'];
+const REFINE_Q3 = ['Logo', 'Color palette', 'Background', 'Subject / product', 'Face / person', 'Lighting', 'Atmosphere', 'Typography'];
 
 function RefineForm({ onSubmit, onCancel }: {
   onSubmit: (state: RefineState) => void;
@@ -728,9 +728,9 @@ function RefineForm({ onSubmit, onCancel }: {
         <span style={{fontSize:12,fontWeight:600,color:'var(--text-1)'}}>What to fix?</span>
         <button onClick={onCancel} style={{color:'var(--text-3)',display:'flex'}}><Icon name="x" size={12}/></button>
       </div>
-      {row('Issue', chips(REFINE_Q1, q1, setQ1), 0.04)}
-      {row('Change', chips(REFINE_Q2, q2, setQ2), 0.08)}
-      {row('Focus on', chips(REFINE_Q3, q3, setQ3), 0.12)}
+      {row("What's wrong", chips(REFINE_Q1, q1, setQ1), 0.04)}
+      {row('Fix direction', chips(REFINE_Q2, q2, setQ2), 0.08)}
+      {row('Prioritise', chips(REFINE_Q3, q3, setQ3), 0.12)}
       <div style={{animation:`fadeSlideUp 0.22s ease 0.16s both`}}>
         <div style={{fontSize:11,color:'var(--text-3)',fontWeight:600,letterSpacing:'0.04em',textTransform:'uppercase',marginBottom:7}}>Notes <span style={{fontWeight:400,textTransform:'none',letterSpacing:'normal'}}>(optional)</span></div>
         <textarea value={q4} onChange={e=>setQ4(e.target.value)}
@@ -1792,10 +1792,10 @@ export default function App() {
 
   const handleRefine = useCallback((msg: StreamMessage, state: RefineState) => {
     if (!msg.prompt) return;
-    const issues = state.q1.length ? `Issues: ${state.q1.join(', ')}.` : '';
-    const changes = state.q2.length ? `Changes needed: ${state.q2.join(', ')}.` : '';
-    const focus = state.q3.length ? `Focus on: ${state.q3.join(', ')}.` : '';
-    const notes = state.q4.trim() ? `Direction: ${state.q4.trim()}` : '';
+    const issues = state.q1.length ? `Problems: ${state.q1.join(', ')}.` : '';
+    const changes = state.q2.length ? `Fix direction: ${state.q2.join(', ')}.` : '';
+    const focus = state.q3.length ? `Prioritise: ${state.q3.join(', ')}.` : '';
+    const notes = state.q4.trim() ? `Additional direction: ${state.q4.trim()}` : '';
     const feedback = [issues, changes, focus, notes].filter(Boolean).join(' ');
     const refinedPrompt = `${msg.prompt}\n\nREFINEMENT REQUEST: The previous generation had problems. ${feedback} Please generate a significantly improved version that fixes these specific issues while maintaining full brand DNA compliance.`;
     const refs = msg.referenceImages ?? [];
