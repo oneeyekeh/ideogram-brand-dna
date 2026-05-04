@@ -112,7 +112,7 @@ function buildAssetsSection(hasLogo: boolean, refCount: number, brand?: BrandDNA
     ? `- Logo attached: yes, official logo for ${brand?.name ?? 'the brand'}. Include the logo visibly in the scene — render it accurately with correct shape, colors, proportions, and weight. Do not invent a substitute or place it out of frame.`
     : '- Logo attached: no. Do not invent a logo unless the user explicitly asks for one.');
   lines.push(refCount > 0
-    ? `- References attached: ${refCount}. Use them for relevant subject, composition, typography feel, tone, material, layout, and mood.`
+    ? `- References attached: ${refCount}. Use them for relevant subject, composition, typography feel, tone, material or product placement, layout, and mood.`
     : '- References attached: none. Infer style from the prompt and Brand DNA only.');
   return lines.join('\n');
 }
@@ -133,7 +133,7 @@ function buildOutputStandard(): string {
     'OUTPUT STANDARD',
     '- Commercial campaign quality with clean hierarchy, coherent lighting, and sharp focal detail.',
     '- Avoid visual glitches, warped anatomy, random text, watermarks, and accidental extra logos.',
-    '- If text is requested, keep it intentional, minimal, and readable.',
+    '- If text is requested, keep it intentional and readable — make sure the typography is compatible with the mood, voice, and logo/reference if supplied.',
     '- If the task mentions a product but no product/reference is supplied, represent the brand offering or campaign idea instead of inventing an unrelated physical product.',
   ].join('\n');
 }
@@ -172,8 +172,9 @@ function buildFullPrompt(
     '',
     'GENERATION DIRECTION',
     '- User task defines the scene and goal.',
-    '- Brand DNA defines the visual identity, tone, and color system.',
-    '- Attached logo and references are grounding assets, not optional decoration.',
+    '- Campaign type will help you generate a relevant image and adjust your output to the user\'s goals.',
+    '- Brand DNA defines the logo, visual identity, brand voice, and color system — it is grounding, not optional decoration.',
+    '- Attached references are grounding assets, not optional decoration.',
     '- Campaign type is planning context only; do not let it override the user task.',
     '',
     buildOutputStandard(),
