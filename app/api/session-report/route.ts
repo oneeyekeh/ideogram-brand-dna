@@ -120,6 +120,9 @@ export async function POST(req: NextRequest) {
     '- Always rate every element that was active in any run. Never skip an element.',
     '- If feedback is 100% positive and nothing failed, say so clearly.',
     '- 👍 = model respected the request. 👎 = model failed or produced off-brand result.',
+    '- "unrated" means the user did not give feedback — it does NOT mean the image was bad.',
+    '  Never infer quality from missing feedback. If all feedback is unrated, say "No feedback yet" and skip performance ratings.',
+    '  Only rate elements when there is at least one 👍 or 👎 to base it on.',
     '',
     'FORMAT — use exactly this structure:',
     '',
@@ -127,13 +130,15 @@ export async function POST(req: NextRequest) {
     'Runs: N | Images: N | Useful: N | Not useful: N | Brand: X | Model: Y',
     '',
     '## Model Performance',
-    'Rate every element that was active. One line each:',
+    'Rate every element that was active AND has feedback evidence. One line each:',
     '  ✓ Name — short reason it worked',
     '  ✗ Name — short reason it failed, which run',
     '  ~ Name — mixed: what worked, what didn\'t',
+    '  ? Name — no feedback yet',
     '',
     '## What to try next',
     '2–4 bullets. Specific. If the session was successful, suggest what to push further or test next.',
+    'If there is no feedback, focus on what to try or rate in the next session.',
   ].join('\n');
 
   const userText = [
