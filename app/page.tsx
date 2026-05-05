@@ -522,7 +522,7 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
   };
 
   const handleSend = () => {
-    if (!value.trim() && attached.length === 0) return;
+    if (!value.trim() && attached.length === 0 && activeMods === 0) return;
     const base = value.trim() || 'Generate an on-brand image';
     onSend(buildPromptWithMods(base, mods));
   };
@@ -653,7 +653,7 @@ function Composer({ value, setValue, onSend, brand, setActiveBrand, activePreset
         </div>
 
         <div className="spacer"/>
-        <button className="send-btn" onClick={handleSend} disabled={!value.trim() && attached.length === 0}>
+        <button className="send-btn" onClick={handleSend} disabled={!value.trim() && attached.length === 0 && activeMods === 0}>
           <Icon name="arrowU" size={14} stroke={2.2}/>
         </button>
       </div>
