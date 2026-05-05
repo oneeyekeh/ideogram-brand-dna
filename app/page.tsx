@@ -268,35 +268,48 @@ function extractDominantColors(dataURL: string, count = 10): Promise<string[]> {
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(img, 0, 0, size, size);
       const d = ctx.getImageData(0, 0, size, size).data;
-      const freq: Record<string, number> = {};
 
+      // Pass 1: colorful pixels only
+      const freq: Record<string, number> = {};
       for (let i = 0; i < d.length; i += 4) {
         const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
-        if (a < 128) continue;                         // transparent
+        if (a < 128) continue;
         if (r > 235 && g > 235 && b > 235) continue;  // near-white
         if (r < 20  && g < 20  && b < 20)  continue;  // near-black
-
-        const cmax = Math.max(r, g, b);
-        const cmin = Math.min(r, g, b);
-        const sat = cmax - cmin;                        // 0=gray, 255=vivid
-        if (sat < 30) continue;                        // skip grays entirely
-
-        // Finer quantization for vivid colors so they don't merge
+        const sat = Math.max(r, g, b) - Math.min(r, g, b);
+        if (sat < 30) continue;                        // skip grays
         const step = sat > 80 ? 20 : 32;
-        const rq = Math.round(r / step) * step;
-        const gq = Math.round(g / step) * step;
-        const bq = Math.round(b / step) * step;
-        const k = `${rq},${gq},${bq}`;
-        // Weight by saturation: vivid colors count 2-4x more
+        const k = `${Math.round(r/step)*step},${Math.round(g/step)*step},${Math.round(b/step)*step}`;
         freq[k] = (freq[k] ?? 0) + 1 + Math.floor(sat / 40);
       }
 
-      const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
-      const colors = sorted.slice(0, count).map(([k]) => {
-        const [r, g, b] = k.split(',').map(Number);
-        return '#' + [r, g, b].map(v => Math.min(255, v).toString(16).padStart(2, '0')).join('');
-      });
-      resolve(colors.length ? colors : []);
+      const colorful = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, count)
+        .map(([k]) => '#' + k.split(',').map(v => Math.min(255, Number(v)).toString(16).padStart(2, '0')).join(''));
+
+      if (colorful.length >= 2) { resolve(colorful); return; }
+
+      // Pass 2: B&W / grayscale fallback — extract distinct luminance tones
+      const grayFreq: Record<number, number> = {};
+      for (let i = 0; i < d.length; i += 4) {
+        const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
+        if (a < 128) continue;
+        const sat = Math.max(r, g, b) - Math.min(r, g, b);
+        if (sat > 40) continue; // skip colorful pixels in fallback
+        const luma = Math.round((r * 0.299 + g * 0.587 + b * 0.114) / 15) * 15;
+        grayFreq[luma] = (grayFreq[luma] ?? 0) + 1;
+      }
+      const sorted = Object.entries(grayFreq)
+        .sort((a, b) => Number(b[1]) - Number(a[1]));
+      const picks: number[] = [];
+      for (const [lStr] of sorted) {
+        const l = Number(lStr);
+        if (!picks.some(p => Math.abs(p - l) < 30)) {
+          picks.push(l);
+          if (picks.length >= count) break;
+        }
+      }
+      const grays = picks.map(l => '#' + [l, l, l].map(v => v.toString(16).padStart(2, '0')).join(''));
+      resolve([...colorful, ...grays].slice(0, count));
     };
     img.onerror = () => resolve([]);
     img.src = dataURL;
