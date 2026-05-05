@@ -31,9 +31,9 @@ const OVERRIDE_ON_SIGNALS: Array<{ label: string; keywords: string[] }> = [
   { label: 'Text / Copy', keywords: ['brand name as text', 'intentional creative or campaign text'] },
   { label: 'Face',        keywords: ['face clearly visible'] },
   { label: 'Person',      keywords: ['person in scene'] },
-  { label: 'Copy Space',  keywords: ['generous negative space'] },
-  { label: 'Atmosphere',  keywords: ['lifestyle atmosphere', 'clean studio'] },
-  { label: 'Brand Colors',keywords: ['brand colors dominant'] },
+  { label: 'Copy Space',   keywords: ['generous negative space'] },
+  { label: 'Ref Images',   keywords: ['strictly follow reference image', 'use reference image only as loose creative inspiration'] },
+  { label: 'Brand Colors', keywords: ['brand colors dominant'] },
 ];
 
 function classifyRun(prompt: string): 'base' | 'followup' | 'refinement' {

@@ -189,7 +189,7 @@ const BRANDING_MODS: BrandingMod[] = [
   { id: 'person',      label: 'Person',        onLabel: 'With person',     offLabel: 'No people',        onTag: 'person in scene',                            offTag: 'no people in frame',          defaultOn: false },
   { id: 'face',        label: 'Face',          onLabel: 'Face visible',    offLabel: 'Face hidden',      onTag: 'face clearly visible',                        offTag: 'no face visible, hands or back only', defaultOn: false },
   { id: 'copySpace',   label: 'Copy space',    onLabel: 'Space for copy',  offLabel: null,               onTag: 'generous negative space for text overlay',    offTag: null,                          defaultOn: false },
-  { id: 'lifestyle',   label: 'Atmosphere',    onLabel: 'Lifestyle feel',  offLabel: 'Studio clean',     onTag: 'lifestyle atmosphere and context',            offTag: 'clean studio, minimal context', defaultOn: false },
+  { id: 'refImages',   label: 'Ref images',    onLabel: 'Follow refs',     offLabel: 'Ignore refs',      onTag: 'strictly follow reference image composition, style, and mood', offTag: 'use reference image only as loose creative inspiration, do not replicate directly', defaultOn: false },
 ];
 
 function getDefaultBrandingMods(): BrandingModState {
