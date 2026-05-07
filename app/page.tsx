@@ -183,7 +183,6 @@ interface BrandingMod {
 type BrandingModState = Record<string, boolean | null>;
 
 const BRANDING_MODS: BrandingMod[] = [
-  { id: 'logo',        label: 'Logo',          onLabel: 'Logo visible',    offLabel: 'No logo',          onTag: 'logo accurately rendered and visible',        offTag: 'no logo',                     defaultOn: false },
   { id: 'text',        label: 'Text',          onLabel: 'Text allowed',    offLabel: 'No text',          onTag: 'intentional creative or campaign text allowed when useful', offTag: 'no text',                     defaultOn: false },
   { id: 'brandColors', label: 'Brand palette', onLabel: 'Brand palette',   offLabel: 'Neutral palette',  onTag: 'brand colors dominant throughout scene',      offTag: 'neutral muted color palette', defaultOn: true  },
   { id: 'person',      label: 'Person',        onLabel: 'With person',     offLabel: 'No people',        onTag: 'person in scene',                            offTag: 'no people in frame',          defaultOn: false },
