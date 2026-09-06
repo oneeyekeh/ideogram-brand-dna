@@ -1,40 +1,29 @@
-# Ideogram Brand DNA
+# ideogram-brand-dna
 
-Brand-consistent image generation prototype built for the Ideogram PM take-home.
+A weekend prototype around one question: what if an image generator actually knew your brand?
 
-## Setup
+You give it a logo, a few colors, and a sentence about your voice. It turns that into a "Brand DNA", and every image you generate afterwards stays on-brand. Attach a few campaign reference images if you want to steer it further. Built in May 2026 for an Ideogram PM take-home, on top of Gemini's image model.
+
+**Live:** https://ideogram-brand-dna.vercel.app
+
+## Try it
 
 ```bash
 npm install
-cp .env.local.example .env.local
-# Add your GEMINI_API_KEY to .env.local
+cp .env.local.example .env.local   # add your GEMINI_API_KEY
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+## How it flows
 
-## User flow
+1. **Brand DNA** — upload a logo, pick colors, describe the voice.
+2. **Explore** — type a prompt, pick your brand from the pill, optionally attach up to five reference images.
+3. **Batch** — two images generate in parallel. Click one for the detail view, downloads, and variations.
 
-1. **Brand DNA** (sidebar → Brand DNA) — create a brand: upload logo, pick colors, describe voice.
-2. **Explore** — type a prompt, pick your brand from the pill in the composer, optionally attach up to five campaign reference images, hit ↑.
-3. **Batch** — chat panel left, generated images right. Two images generate in parallel via Gemini Flash Image.
-4. Click any image to open the detail view with download + variation thumbnails.
+## Under the hood
 
-## Environment
+Next.js App Router, TypeScript, Gemini called over plain HTTP with no SDK, brand data kept in `localStorage`. Mostly built pair-programming with Claude Code.
 
-| Variable | Description |
-|---|---|
-| `GEMINI_API_KEY` | Google AI Studio API key |
+## Who made this
 
-The API route tries these Gemini models in order (picks first that works):
-- `gemini-2.0-flash-preview-image-generation`
-- `gemini-2.0-flash-exp-image-generation`
-- `gemini-2.0-flash-exp`
-
-## Tech
-
-- Next.js 14 (App Router)
-- React 18, TypeScript
-- Gemini API via direct HTTP (no SDK dependency)
-- Brand DNA stored in `localStorage`
-- Campaign reference images are attached per generation from the composer
+Onee Yekeh. Technical PM at HeyGen, ex-founder, design background. More at [oneeyekeh/personal-site](https://github.com/oneeyekeh/personal-site).
